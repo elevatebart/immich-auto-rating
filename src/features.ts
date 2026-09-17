@@ -60,17 +60,34 @@ export function featureVector(f: Features): number[] {
   ]
 }
 
-/** Resolves configured household entries, which may be names or ids, against the people list. */
+/** Case and accent insensitive key. "Thais" and "Thaïs" fold together, so a config typo still matches. */
+function fold(name: string): string {
+  return name
+    .trim()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+}
+
+/**
+ * Resolves configured household entries, which may be names or ids. Exact names win; a folded
+ * match is the fallback, and is skipped where folding would make two people ambiguous.
+ */
 export function resolveHousehold(
   configured: string[],
   people: { id: string; name: string }[],
 ): { ids: Set<string>; unmatched: string[] } {
   const byName = new Map<string, string>()
+  const byFolded = new Map<string, string | null>()
   const ids = new Set<string>()
   for (const p of people) {
     byName.set(p.name.trim().toLowerCase(), p.id)
     ids.add(p.id)
+    const key = fold(p.name)
+    // A second person folding to the same key makes the key useless, so poison it rather than guess.
+    byFolded.set(key, byFolded.has(key) && byFolded.get(key) !== p.id ? null : p.id)
   }
+
   const out = new Set<string>()
   const unmatched: string[] = []
   for (const entry of configured) {
@@ -79,8 +96,13 @@ export function resolveHousehold(
       out.add(trimmed)
       continue
     }
-    const hit = byName.get(trimmed.toLowerCase())
-    if (hit) out.add(hit)
+    const exact = byName.get(trimmed.toLowerCase())
+    if (exact) {
+      out.add(exact)
+      continue
+    }
+    const folded = byFolded.get(fold(trimmed))
+    if (folded) out.add(folded)
     else unmatched.push(entry)
   }
   return { ids: out, unmatched }

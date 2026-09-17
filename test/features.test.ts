@@ -110,6 +110,26 @@ describe('resolveHousehold', () => {
     expect(resolveHousehold(['p2'], people).ids).toEqual(new Set(['p2']))
   })
 
+  it('matches through a missing diacritic, which is the likeliest config typo', () => {
+    const accented = [{ id: 'p3', name: 'Thaïs Heintz' }, { id: 'p4', name: 'Sébastien Ledoux' }]
+    const out = resolveHousehold(['Thais Heintz', 'Sebastien Ledoux'], accented)
+    expect(out.ids).toEqual(new Set(['p3', 'p4']))
+    expect(out.unmatched).toEqual([])
+  })
+
+  it('prefers an exact name over a folded one', () => {
+    const both = [{ id: 'pA', name: 'Thais Heintz' }, { id: 'pB', name: 'Thaïs Heintz' }]
+    expect(resolveHousehold(['Thais Heintz'], both).ids).toEqual(new Set(['pA']))
+    expect(resolveHousehold(['Thaïs Heintz'], both).ids).toEqual(new Set(['pB']))
+  })
+
+  it('refuses to guess when folding makes two people ambiguous', () => {
+    const both = [{ id: 'pA', name: 'Thaïs Heintz' }, { id: 'pB', name: 'Thaîs Heintz' }]
+    const out = resolveHousehold(['Thais Heintz'], both)
+    expect(out.ids.size).toBe(0)
+    expect(out.unmatched).toEqual(['Thais Heintz'])
+  })
+
   it('reports names it could not find instead of failing silently', () => {
     const out = resolveHousehold(['Bart Ledoux', 'Nobody'], people)
     expect(out.ids).toEqual(new Set(['p1']))
