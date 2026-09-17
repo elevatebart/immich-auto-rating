@@ -153,18 +153,16 @@ nothing. `docker network ls` after an Immich stack rename is the place to re-che
 The image runs as `node`, not root, on `node:24-alpine` with `tini` as PID 1. Nothing is scheduled
 inside it: one invocation, one run, exit.
 
-### One-time setup
+### Ownership of the mount
 
-The container runs as the `node` user, uid 1000, so the bind mount has to be writable by uid 1000
-or the first run cannot create `state.sqlite`. A DSM task running as root creates root-owned
-directories, which uid 1000 cannot write to. Run this once, as a root task:
+The container runs as the `node` user, uid 1000. The bind mount has to be owned by uid 1000, or the
+run cannot read `config.toml` and cannot create `state.sqlite`.
 
-```bash
-mkdir -p /volume1/tools/immich-auto-rating/data/state && chown -R 1000:1000 /volume1/tools/immich-auto-rating/data
-```
-
-`config.toml` inside `data/` only needs to be readable, but it is simplest to let the `chown` take
-it along.
+This bites more than once. Anything you upload or edit through File Station is created owned by
+your DSM user, so a file added after a `chown` is unreadable again, and the failure looks like a
+config problem rather than a permissions one. The fix is to let the task do it: it runs as root, so
+it can hand the directory over on every run. Both commands below start with that `chown`, and
+nothing else is needed as one-time setup.
 
 ### DSM Task Scheduler
 
@@ -177,7 +175,7 @@ anyone who can reach the Docker socket can mount the host into a privileged cont
 root anyway. The user that matters is the container's own, and that is `node`, not root.
 
 ```bash
-cd /volume1/tools/immich-auto-rating && /usr/local/bin/docker compose pull -q rate && /usr/local/bin/docker compose run --rm rate apply
+cd /volume1/tools/immich-auto-rating && chown -R 1000:1000 data && /usr/local/bin/docker compose pull -q rate && /usr/local/bin/docker compose run --rm rate apply
 ```
 
 The `pull` keeps the NAS on the published `linux/amd64` image. Tick "send run details by email" on
@@ -186,7 +184,7 @@ The `pull` keeps the NAS on the published `linux/amd64` image. Tick "send run de
 To look at a run without writing anything, swap the verb:
 
 ```bash
-cd /volume1/tools/immich-auto-rating && /usr/local/bin/docker compose run --rm rate report
+cd /volume1/tools/immich-auto-rating && chown -R 1000:1000 data && /usr/local/bin/docker compose run --rm rate report
 ```
 
 ## Releases

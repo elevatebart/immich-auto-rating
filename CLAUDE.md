@@ -70,7 +70,9 @@ hand in the Immich UI. Node 24, TS strict, ESM, tsdown, vitest. Sibling of `immi
 - **No scheduler inside the app.** One invocation, one run, exit. DSM Task Scheduler does the timing.
 - The DSM task must run as **root**: the Docker socket on DSM is root-owned with no usable `docker`
   group. The container itself still runs as `node`, uid 1000, so the bind mount needs to be owned by
-  1000 or the first run cannot create `state.sqlite`.
+  1000 or the run cannot read `config.toml` and cannot create `state.sqlite`. File Station creates
+  uploads owned by the DSM user, so the DSM task chowns `data/` on every run rather than relying on
+  a one-time fix that the next config edit undoes.
 - The Immich stack on that host is the `immich-photos` compose project, so the external network is
   `immich-photos_default`. An unrelated `immich_default` exists on the same host and resolves nothing.
 
