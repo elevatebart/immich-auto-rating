@@ -82,12 +82,12 @@ describe('scoreZeroShot', () => {
     const out = scoreZeroShot(cands, prompts, testConfig)
     const counts = new Map<number, number>()
     for (const s of out) counts.set(s.rating, (counts.get(s.rating) ?? 0) + 1)
-    // quantiles [0.15, 0.4, 0.7, 0.9] over 100 assets, ranks running r/99.
+    // quantiles [0.15, 0.4, 0.90, 0.975] over 100 assets, ranks running r/99.
     expect(counts.get(1)).toBe(15)
     expect(counts.get(2)).toBe(25)
-    expect(counts.get(3)).toBe(30)
-    expect(counts.get(4)).toBe(20)
-    expect(counts.get(5)).toBe(10)
+    expect(counts.get(3)).toBe(50)
+    expect(counts.get(4)).toBe(7)
+    expect(counts.get(5)).toBe(3)
   })
 
   it('bumps an asset holding a household face by one star, capped at 5', () => {

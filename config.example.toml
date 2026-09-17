@@ -30,7 +30,9 @@ negative = [
 
 [pool]
 album = "Wallpaper pool"
-min_rating = 4
+# 5 rather than 4. Ratings here are ranks, so a 4 means "top quarter", not "good": at min_rating 4
+# the pool took 39% of the library on a real run.
+min_rating = 5
 
 [exif]
 # A ratio within tolerance of one of these reads as screenshot shaped, but only when the file
@@ -53,8 +55,18 @@ folds = 5
 [zeroshot]
 # A negative prompt has to beat every positive one by this much softmax mass to force a 1.
 negative_margin = 0.15
-# Quantile cut points over the run's positive mass, low to high, giving the 1..5 buckets.
-quantiles = [0.15, 0.4, 0.7, 0.9]
+# Cut points over the run's rank, low to high, giving the 1..5 buckets. These say 15% of the
+# library is 1 star, 25% is 2, 50% is 3, 7.5% is 4, 2.5% is 5.
+#
+# Ratings are RELATIVE. The bottom 15% gets 1 star whether or not anything in it is bad, and the
+# pool size is decided here, not by how many good photos you have.
+#
+# The top two cuts have to move together. The household bump promotes a share of the 4 star bucket
+# into 5, so a wider 4 star bucket feeds a bigger 5 star one:
+#   5 star share = (1 - cut4) + household_face_rate * (cut4 - cut3)
+# At a measured 39% household face rate, [.., 0.7, 0.9] gives 18% and [.., 0.90, 0.975] gives 5.4%.
+# Re-run `report` after changing these: it prints the count per rating and the resulting pool size.
+quantiles = [0.15, 0.4, 0.90, 0.975]
 
 [ml]
 # Leave empty to read machineLearning.clip.modelName from GET /api/admin/config.

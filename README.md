@@ -79,7 +79,12 @@ exits non-zero after logging `apply.partial_failure` with the counts.
 - `exif.screenshot_ratios`: a ratio match only counts when the file **also carries no EXIF camera
   make**. 4:3 and 16:9 are camera ratios as much as screen ratios, so the ratio alone proves
   nothing. A `exif.filename_patterns` match is enough on its own.
-- `zeroshot.quantiles`: four cut points giving the five buckets, applied to rank.
+- `zeroshot.quantiles`: four cut points giving the five buckets, applied to **rank**. Ratings are
+  therefore relative: the bottom `quantiles[0]` share gets 1 star whatever it holds, and the pool
+  size is set here rather than by how many good photos exist. The top two cuts move together,
+  because the household bump promotes a share of the 4 star bucket into 5:
+  `5 star share = (1 - cut4) + household_face_rate * (cut4 - cut3)`.
+- `pool.min_rating`: 5 by default. At 4 the pool took 39% of a real 18,000 asset library.
 - `ridge.min_labels`: how many corrections before the learned model takes over from the prompts.
 - `ml.model_name`: leave empty to read it from the server. Set it when the API key is not allowed
   `adminConfig.read`.

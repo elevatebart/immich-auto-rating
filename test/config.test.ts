@@ -6,7 +6,7 @@ import { testConfig } from './fixtures/assets.js'
 describe('config', () => {
   it('reads the example config', () => {
     expect(testConfig.pool.album).toBe('Wallpaper pool')
-    expect(testConfig.pool.minRating).toBe(4)
+    expect(testConfig.pool.minRating).toBe(5)
     expect(testConfig.zeroshot.quantiles).toHaveLength(4)
     expect(testConfig.prompts.negative.length).toBeGreaterThan(0)
   })
