@@ -93,14 +93,23 @@ exits non-zero after logging `apply.partial_failure` with the counts.
 | `PGHOST` `PGPORT` `PGUSER` `PGPASSWORD` `PGDATABASE` | A **read-only** role on the Immich DB. |
 | `STATE_DIR` | Where `state.sqlite` lives. `/data/state` in the container. |
 
-The Postgres role only ever needs to read `smart_search`:
+The Postgres role only ever needs to read `smart_search`. Create it from a root DSM task, since
+there is no SSH, generating the password in place so it never passes through anything else:
 
-```sql
-CREATE ROLE immich_ro LOGIN PASSWORD 'change-me';
-GRANT CONNECT ON DATABASE immich TO immich_ro;
+```bash
+cd /volume1/docker/immich-auto-rating && PGU=$(docker exec immich_postgres printenv POSTGRES_USER) && PGD=$(docker exec immich_postgres printenv POSTGRES_DB) && PW=$(od -An -tx1 -N24 /dev/urandom | tr -d ' \n') && docker exec -i immich_postgres psql -U "$PGU" -d "$PGD" -v ON_ERROR_STOP=1 <<SQL && printf 'PGPASSWORD=%s\n' "$PW" >> .env && chmod 600 .env
+DO \$\$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'immich_ro') THEN CREATE ROLE immich_ro LOGIN; END IF;
+END \$\$;
+ALTER ROLE immich_ro PASSWORD '$PW';
+GRANT CONNECT ON DATABASE "$PGD" TO immich_ro;
 GRANT USAGE ON SCHEMA public TO immich_ro;
 GRANT SELECT ON smart_search TO immich_ro;
+SQL
 ```
+
+It grants `SELECT` on one table and nothing else. `smart_search` holds asset ids and CLIP vectors,
+no photo content and no metadata.
 
 ### API key permissions
 
