@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { parse } from 'smol-toml'
 import type { Config } from './types.js'
 
@@ -133,13 +134,30 @@ function validate(cfg: Config): void {
 }
 
 export function loadConfig(path: string): Config {
-  let text: string
   try {
-    text = readFileSync(path, 'utf8')
-  } catch {
-    throw new ConfigError(`cannot read ${path}. Copy config.example.toml to config.toml to start.`)
+    return fromToml(readFileSync(path, 'utf8'))
+  } catch (e) {
+    if (e instanceof ConfigError) throw e
+    throw new ConfigError(readFailure(path, e))
   }
-  return fromToml(text)
+}
+
+/** The container cannot be poked at by hand, so say which path and which failure, not just "cannot read". */
+function readFailure(path: string, e: unknown): string {
+  const full = resolve(path)
+  const code = (e as NodeJS.ErrnoException)?.code
+  const who = `running as uid ${typeof process.getuid === 'function' ? process.getuid() : 'unknown'}`
+  switch (code) {
+    case 'ENOENT':
+      return `no config at ${full} (${who}). Copy config.example.toml there, or point CONFIG elsewhere.`
+    case 'EACCES':
+    case 'EPERM':
+      return `${full} exists but is not readable ${who}. chown it to 1000:1000, or chmod a+r.`
+    case 'EISDIR':
+      return `${full} is a directory, not a file. CONFIG must name the config.toml itself.`
+    default:
+      return `cannot read ${full} (${who}): ${code ?? (e instanceof Error ? e.message : String(e))}`
+  }
 }
 
 export { ConfigError }
