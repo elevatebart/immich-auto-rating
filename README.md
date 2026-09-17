@@ -131,10 +131,9 @@ again, and no asset is rated twice in one run.
 
 ## Docker on the NAS
 
-Everything lives under `/volume1/tools/immich-auto-rating`, next to where the albums planner
-already writes:
+Everything lives under `/volume1/docker/immich-auto-rating`:
 
-    /volume1/tools/immich-auto-rating/
+    /volume1/docker/immich-auto-rating/
       docker-compose.yml
       .env                  # the secrets above
       data/
@@ -153,16 +152,22 @@ nothing. `docker network ls` after an Immich stack rename is the place to re-che
 The image runs as `node`, not root, on `node:24-alpine` with `tini` as PID 1. Nothing is scheduled
 inside it: one invocation, one run, exit.
 
-### Ownership of the mount
+### Why `/volume1/docker`, and not any share you like
 
-The container runs as the `node` user, uid 1000. The bind mount has to be owned by uid 1000, or the
-run cannot read `config.toml` and cannot create `state.sqlite`.
+The container runs as the `node` user, uid 1000, so the mount must be readable and writable by uid
+1000. Which share you put it on decides whether that is even possible.
 
-This bites more than once. Anything you upload or edit through File Station is created owned by
-your DSM user, so a file added after a `chown` is unreadable again, and the failure looks like a
-config problem rather than a permissions one. The fix is to let the task do it: it runs as root, so
-it can hand the directory over on every run. Both commands below start with that `chown`, and
-nothing else is needed as one-time setup.
+`/volume1/tools` and most shares created through the DSM UI are **ACL-only**: `ls -la` shows mode
+`000` with a `+`, and a single ACL entry granting `group:administrators`. POSIX permissions there
+are inert. `chown` reports success and changes nothing, `synoacltool` refuses to grant a uid with
+no DSM account behind it, and a non-root container simply cannot read the directory. A container
+running as root does not notice any of this, which is why other tools on the NAS work there.
+
+`/volume1/docker` is `dr-xr-xr-x` with real POSIX bits, so `chown` and `chmod` both work. What it
+does **not** give you is a write bit: new directories inherit mode `555`, owner included. So the
+mount needs `chown` **and** `chmod`, and it needs them again after every File Station upload, since
+uploads arrive owned by your DSM user. Both commands below start with that pair, so there is no
+one-time setup to forget.
 
 ### DSM Task Scheduler
 
@@ -175,7 +180,7 @@ anyone who can reach the Docker socket can mount the host into a privileged cont
 root anyway. The user that matters is the container's own, and that is `node`, not root.
 
 ```bash
-cd /volume1/tools/immich-auto-rating && chown -R 1000:1000 data && /usr/local/bin/docker compose pull -q rate && /usr/local/bin/docker compose run --rm rate apply
+cd /volume1/docker/immich-auto-rating && chown -R 1000:1000 data && chmod -R u+rwX data && /usr/local/bin/docker compose pull -q rate && /usr/local/bin/docker compose run --rm rate apply
 ```
 
 The `pull` keeps the NAS on the published `linux/amd64` image. Tick "send run details by email" on
@@ -184,7 +189,7 @@ The `pull` keeps the NAS on the published `linux/amd64` image. Tick "send run de
 To look at a run without writing anything, swap the verb:
 
 ```bash
-cd /volume1/tools/immich-auto-rating && chown -R 1000:1000 data && /usr/local/bin/docker compose run --rm rate report
+cd /volume1/docker/immich-auto-rating && chown -R 1000:1000 data && chmod -R u+rwX data && /usr/local/bin/docker compose run --rm rate report
 ```
 
 ## Releases

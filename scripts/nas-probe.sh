@@ -7,13 +7,13 @@ DOCKER=/usr/local/bin/docker
 # exists wins. The log lands beside it, in a directory that demonstrably already exists.
 for candidate in \
   "$ENV_FILE" \
-  /volume1/tools/immich-auto-rating/.env \
-  /volume1/docker/immich-auto-rating/.env
+  /volume1/docker/immich-auto-rating/.env \
+  /volume1/tools/immich-auto-rating/.env
 do
   [ -n "$candidate" ] && [ -f "$candidate" ] && ENV_FILE="$candidate" && break
 done
 
-BASE=${OUT:-$(dirname "${ENV_FILE:-/volume1/tools/immich-auto-rating/.env}")}
+BASE=${OUT:-$(dirname "${ENV_FILE:-/volume1/docker/immich-auto-rating/.env}")}
 LOG="$BASE/probe-$(date +%Y%m%d-%H%M%S).txt"
 
 mkdir -p "$BASE"
@@ -56,7 +56,7 @@ if [ -n "$IMMICH_API_KEY" ] && [ -n "$IMMICH_URL" ]; then
     | sed -n 's/.*"clip":{\([^}]*\)}.*/clip:{\1}/p'
   echo "(empty above means the key lacks adminConfig.read, or the shape moved)"
 else
-  echo "SKIP: need IMMICH_URL and IMMICH_API_KEY in /volume1/tools/immich-auto-rating/.env"
+  echo "SKIP: need IMMICH_URL and IMMICH_API_KEY in /volume1/docker/immich-auto-rating/.env"
 fi
 
 # 3. The /predict contract: is the clip value a JSON string, and how wide.
