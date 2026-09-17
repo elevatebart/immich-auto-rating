@@ -22,6 +22,7 @@ const USAGE = `immich-auto-rating <command>
 Options
   --config <path>   config.toml location, else CONFIG, else ./config.toml
   --top <n>         how many uncertain assets report prints (default 30)
+  --sample <n>      also print n representative links per rating and per rule
 `
 
 interface Args {
@@ -30,6 +31,7 @@ interface Args {
   config: string
   dryRun: boolean
   top: number
+  sample: number
 }
 
 function parseArgs(argv: string[]): Args {
@@ -37,14 +39,16 @@ function parseArgs(argv: string[]): Args {
   let config = process.env.CONFIG ?? './config.toml'
   let dryRun = false
   let top = 30
+  let sample = 0
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!
     if (a === '--config') config = argv[++i] ?? config
     else if (a === '--top') top = Number(argv[++i] ?? top)
+    else if (a === '--sample') sample = Number(argv[++i] ?? sample)
     else if (a === '--dry-run') dryRun = true
     else rest.push(a)
   }
-  return { command: rest[0] ?? '', rest: rest.slice(1), config, dryRun, top }
+  return { command: rest[0] ?? '', rest: rest.slice(1), config, dryRun, top, sample }
 }
 
 async function main(): Promise<number> {
@@ -96,7 +100,7 @@ async function main(): Promise<number> {
     const plan = await score(cfg, env, prep)
 
     if (args.command === 'report') {
-      const report = buildReport(plan.scored, env.immichUrl, args.top, cfg.pool.minRating)
+      const report = buildReport(plan.scored, env.immichUrl, args.top, cfg.pool.minRating, args.sample)
       log.info('report', {
         mode: plan.mode,
         counts: report.counts,
@@ -109,7 +113,7 @@ async function main(): Promise<number> {
     }
 
     if (args.command === 'rate') {
-      const report = buildReport(plan.scored, env.immichUrl, args.top, cfg.pool.minRating)
+      const report = buildReport(plan.scored, env.immichUrl, args.top, cfg.pool.minRating, args.sample)
       log.info('rate.plan', {
         mode: plan.mode,
         dryRun: true,

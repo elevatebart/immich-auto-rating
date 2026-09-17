@@ -64,7 +64,14 @@ trains as a `1`.
 | `refit` | no | Retrains from frozen labels, prints k-fold MAE. |
 | `freeze <id...>` | no | Freezes assets by hand, taking their current rating as the label. |
 
-All of them take `--config <path>`; `report` and `rate` take `--top <n>`.
+All of them take `--config <path>`; `report` and `rate` take `--top <n>` and `--sample <n>`.
+
+`--sample <n>` prints n representative links per rating and per rule, spread evenly through each
+bucket by score rather than taken off one end. Use it before the first `apply`: the counts tell you
+the buckets are the right size, but only looking tells you whether the prompts put good photographs
+at the top and receipts at the bottom. The `rule negative-prompt` sample is the one to check
+hardest, since that rule sends assets to 1 star on CLIP's say-so alone, and a saturated softmax
+means it is always confident whether or not it is right.
 
 Logs are JSON on stdout, warnings and errors on stderr. A run that failed to write some batches
 exits non-zero after logging `apply.partial_failure` with the counts.

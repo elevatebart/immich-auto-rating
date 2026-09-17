@@ -8,13 +8,30 @@ export interface Report {
   poolMin: number
   total: number
   uncertain: { id: string; rating: number; uncertainty: number; raw: number; rule?: Rule; url: string }[]
+  /** Representative links per rating and per rule, for judging by eye what no count can show. */
+  samples: { label: string; urls: string[] }[]
 }
 
 export function assetUrl(baseUrl: string, id: string): string {
   return `${baseUrl.replace(/\/+$/, '')}/photos/${id}`
 }
 
-export function buildReport(scored: Scored[], baseUrl: string, top = 30, poolMinRating = 4): Report {
+/** Evenly spaced picks through a bucket ordered by score, so a sample spans it instead of clumping. */
+function spread<T>(items: T[], n: number): T[] {
+  if (n <= 0 || items.length === 0) return []
+  if (items.length <= n) return items
+  const out: T[] = []
+  for (let i = 0; i < n; i++) out.push(items[Math.floor((i * items.length) / n)]!)
+  return out
+}
+
+export function buildReport(
+  scored: Scored[],
+  baseUrl: string,
+  top = 30,
+  poolMinRating = 4,
+  sample = 0,
+): Report {
   const counts: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
   const rules: Record<string, number> = {}
   let poolSize = 0
@@ -36,7 +53,24 @@ export function buildReport(scored: Scored[], baseUrl: string, top = 30, poolMin
       url: assetUrl(baseUrl, s.id),
     }))
 
-  return { counts, rules, poolSize, poolMin: poolMinRating, total: scored.length, uncertain }
+  const samples: { label: string; urls: string[] }[] = []
+  if (sample > 0) {
+    const byScore = [...scored].sort((a, b) => a.raw - b.raw || a.id.localeCompare(b.id))
+    for (const r of ['5', '4', '3', '2', '1']) {
+      const items = byScore.filter((s) => String(s.rating) === r)
+      if (items.length > 0) {
+        samples.push({ label: `${r} star (${items.length})`, urls: spread(items, sample).map((s) => assetUrl(baseUrl, s.id)) })
+      }
+    }
+    for (const rule of Object.keys(rules).sort()) {
+      const items = byScore.filter((s) => s.rule === rule)
+      if (items.length > 0) {
+        samples.push({ label: `rule ${rule} (${items.length})`, urls: spread(items, sample).map((s) => assetUrl(baseUrl, s.id)) })
+      }
+    }
+  }
+
+  return { counts, rules, poolSize, poolMin: poolMinRating, total: scored.length, uncertain, samples }
 }
 
 /** Human readable block for the terminal. The JSON log line stays the machine readable one. */
@@ -61,6 +95,11 @@ export function formatReport(report: Report, mode: string): string {
   lines.push(`least certain ${report.uncertain.length}, correct these in Immich to train the model:`)
   for (const u of report.uncertain) {
     lines.push(`  ${u.rating} star  conf=${u.uncertainty.toFixed(3)}  ${(u.rule ?? '').padEnd(15)} ${u.url}`)
+  }
+  for (const s of report.samples) {
+    lines.push('')
+    lines.push(`sample, ${s.label}, worst score first:`)
+    for (const url of s.urls) lines.push(`  ${url}`)
   }
   return lines.join('\n')
 }
