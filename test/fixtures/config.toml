@@ -2,8 +2,11 @@
 # No secrets here: IMMICH_API_KEY, PGPASSWORD and the rest come from the environment.
 
 [household]
-# Immich person names, or ids if two people share a name. Names are resolved once per run.
-persons = ["Bart Ledoux", "Thais Heintz"]
+# Immich person names, or ids if two people share a name. Resolved once per run against
+# GET /people. Matching is case insensitive but NOT accent insensitive, so these must be spelled
+# exactly as Immich holds them: "Thais" will not find "Thaïs". Anything that fails to resolve is
+# logged as household.unmatched rather than failing the run, so check the first run's log.
+persons = ["Firstname Lastname", "Other Person"]
 
 [prompts]
 # Zero-shot text prompts, used until the state DB holds ridge.min_labels frozen labels.
