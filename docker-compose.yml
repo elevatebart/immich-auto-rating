@@ -1,32 +1,29 @@
-# Lives at /volume1/docker/immich-auto-rating on the NAS. Nothing runs permanently: DSM Task
-# Scheduler calls `docker compose run --rm rate` once a month. See README.md.
+# Everything lives under /volume1/tools/immich-auto-rating: this file, .env, config.toml and the
+# state DB. Nothing runs permanently, DSM Task Scheduler calls it once a month. See README.md.
+#
+# Paths are absolute and the secrets come from env_file, so `docker compose` behaves the same
+# whatever directory the task happens to run from.
 services:
   rate:
     image: ghcr.io/elevatebart/immich-auto-rating:latest
     # build: .   # uncomment to build on the NAS instead of pulling
     container_name: immich-auto-rating
+    env_file:
+      - /volume1/tools/immich-auto-rating/.env
     environment:
-      IMMICH_URL: ${IMMICH_URL}
-      IMMICH_API_KEY: ${IMMICH_API_KEY}
-      # The ML container on the Immich compose network, reachable over the LAN only.
-      IMMICH_ML_URL: ${IMMICH_ML_URL:-http://immich-machine-learning:3003}
-      PGHOST: ${PGHOST:-immich_postgres}
-      PGPORT: ${PGPORT:-5432}
-      PGUSER: ${PGUSER}
-      PGPASSWORD: ${PGPASSWORD}
-      PGDATABASE: ${PGDATABASE:-immich}
       STATE_DIR: /data/state
       CONFIG: /data/config.toml
     volumes:
       # Holds config.toml and state/state.sqlite. The SQLite file is the memory of the whole thing:
       # back it up, losing it means every hand correction is forgotten.
-      - ./data:/data
+      - /volume1/tools/immich-auto-rating/data:/data
     networks:
       - immich
     command: ["apply"]
 
 networks:
-  # The network Immich's own compose file creates. `docker network ls` gives the real name.
+  # The network Immich's own compose file creates. Check the real name with `docker network ls`
+  # and edit this if it differs.
   immich:
     external: true
-    name: ${IMMICH_NETWORK:-immich_default}
+    name: immich_default

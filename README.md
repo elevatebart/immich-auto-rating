@@ -131,17 +131,23 @@ again, and no asset is rated twice in one run.
 
 ## Docker on the NAS
 
-`/volume1/docker/immich-auto-rating` holds `docker-compose.yml`, `.env` and `data/config.toml`.
+Everything lives under `/volume1/tools/immich-auto-rating`, next to where the albums planner
+already writes:
 
-    /volume1/docker/immich-auto-rating/
+    /volume1/tools/immich-auto-rating/
       docker-compose.yml
       .env                  # the secrets above
       data/
         config.toml
         state/state.sqlite  # created on the first run
 
+Paths in `docker-compose.yml` are absolute and the secrets come in through `env_file`, so the task
+behaves the same whatever directory it runs from. `docker compose` only reads a `.env` sitting in
+its own project directory, which is the trap this avoids.
+
 The container joins Immich's own compose network so `immich-machine-learning` and the database
-resolve by name. Check the real network name with `docker network ls` and set `IMMICH_NETWORK`.
+resolve by name. Check the real name with `docker network ls` and edit `networks.immich.name` if
+it is not `immich_default`.
 
 The image runs as `node`, not root, on `node:24-alpine` with `tini` as PID 1. Nothing is scheduled
 inside it: one invocation, one run, exit.
@@ -152,7 +158,7 @@ Control Panel, Task Scheduler, Create, Scheduled Task, User-defined script. Run 
 on DSM needs it), monthly, and set the user-defined script to:
 
 ```bash
-cd /volume1/docker/immich-auto-rating && /usr/local/bin/docker compose pull -q rate && /usr/local/bin/docker compose run --rm rate apply
+cd /volume1/tools/immich-auto-rating && /usr/local/bin/docker compose pull -q rate && /usr/local/bin/docker compose run --rm rate apply
 ```
 
 The `pull` keeps the NAS on the published `linux/amd64` image. Tick "send run details by email" on
@@ -161,7 +167,7 @@ The `pull` keeps the NAS on the published `linux/amd64` image. Tick "send run de
 To look at a run without writing anything, swap the verb:
 
 ```bash
-cd /volume1/docker/immich-auto-rating && /usr/local/bin/docker compose run --rm rate report
+cd /volume1/tools/immich-auto-rating && /usr/local/bin/docker compose run --rm rate report
 ```
 
 ## Development
