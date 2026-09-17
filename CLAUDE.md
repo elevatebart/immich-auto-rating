@@ -68,3 +68,14 @@ hand in the Immich UI. Node 24, TS strict, ESM, tsdown, vitest. Sibling of `immi
 - `docker/entrypoint.sh` dispatches the verbs, anything else runs verbatim.
 - Never bake `config.toml` into an image, `.dockerignore` excludes it.
 - **No scheduler inside the app.** One invocation, one run, exit. DSM Task Scheduler does the timing.
+- The DSM task must run as **root**: the Docker socket on DSM is root-owned with no usable `docker`
+  group. The container itself still runs as `node`, uid 1000, so the bind mount needs to be owned by
+  1000 or the first run cannot create `state.sqlite`.
+- The Immich stack on that host is the `immich-photos` compose project, so the external network is
+  `immich-photos_default`. An unrelated `immich_default` exists on the same host and resolves nothing.
+
+## Releases
+- `.github/workflows/ci.yml` runs typecheck, tests and build. `image.yml` publishes `linux/amd64` to
+  GHCR: `main` moves `latest`, a `v*` tag adds the version. Docs and scripts do not trigger a build.
+- The repository is public, so **no private hostnames or ids in tracked files**. The contract doc
+  records the Immich version and says `live` for what was probed, never the address.

@@ -50,13 +50,13 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
   # shellcheck disable=SC1090
   . "$ENV_FILE"
 fi
-if [ -n "$IMMICH_API_KEY" ]; then
+if [ -n "$IMMICH_API_KEY" ] && [ -n "$IMMICH_URL" ]; then
   curl -sS -H "x-api-key: $IMMICH_API_KEY" \
-    "${IMMICH_URL:-https://photos.ledoux.cloud}/api/admin/config" \
+    "$IMMICH_URL/api/admin/config" \
     | sed -n 's/.*"clip":{\([^}]*\)}.*/clip:{\1}/p'
   echo "(empty above means the key lacks adminConfig.read, or the shape moved)"
 else
-  echo "SKIP: no IMMICH_API_KEY. Put it in /volume1/tools/immich-auto-rating/.env"
+  echo "SKIP: need IMMICH_URL and IMMICH_API_KEY in /volume1/tools/immich-auto-rating/.env"
 fi
 
 # 3. The /predict contract: is the clip value a JSON string, and how wide.
@@ -79,8 +79,8 @@ fi
 # 4. The search filter DSL: does filter.rating take a range, and does the candidate filter work.
 # curl only, so this one answers even when the task is not running as root.
 say "4. search filter DSL"
-if [ -n "$IMMICH_API_KEY" ]; then
-  URL="${IMMICH_URL:-https://photos.ledoux.cloud}/api/search/metadata"
+if [ -n "$IMMICH_API_KEY" ] && [ -n "$IMMICH_URL" ]; then
+  URL="$IMMICH_URL/api/search/metadata"
   probe() {
     echo "-- $1"
     code=$(curl -sS -o /tmp/probe4.json -w '%{http_code}' -X POST "$URL" \
@@ -100,7 +100,7 @@ if [ -n "$IMMICH_API_KEY" ]; then
   rm -f /tmp/probe4.json
   echo "(the first total is albums, the second is assets)"
 else
-  echo "SKIP: no IMMICH_API_KEY"
+  echo "SKIP: need IMMICH_URL and IMMICH_API_KEY"
 fi
 
 say "done"

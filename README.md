@@ -189,6 +189,24 @@ To look at a run without writing anything, swap the verb:
 cd /volume1/tools/immich-auto-rating && /usr/local/bin/docker compose run --rm rate report
 ```
 
+## Releases
+
+GitHub Actions builds and publishes the image. `.github/workflows/ci.yml` runs typecheck, tests and
+build on every push and PR. `.github/workflows/image.yml` pushes `linux/amd64` to
+`ghcr.io/<owner>/immich-auto-rating`:
+
+| Trigger | Tags published |
+|---|---|
+| push to `main` | `latest` |
+| tag `v*` | `latest` and the version, e.g. `0.2.0` |
+| manual dispatch | `latest`, plus a version if you type one |
+
+Docs, `docs/` and `scripts/` are excluded from the image trigger, since they change nothing about
+what ships. The NAS pulls `latest` before every run, so merging to `main` is what reaches it; tag
+when you want a version you can pin or roll back to.
+
+    git tag v0.2.0 && git push --tags
+
 ## Development
 
     npm test          # vitest, no network, fixtures only

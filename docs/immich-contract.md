@@ -3,8 +3,9 @@
 Facts this CLI depends on, and how each was established. Re-check the `live` rows after an
 Immich upgrade; they are the ones a release can move.
 
-Target server: `https://photos.ledoux.cloud`, **Immich 3.2.0** (`GET /api/server/version` ->
-`{"major":3,"minor":2,"patch":0,"prerelease":null}`, read 2026-09-17).
+Target server: the household Immich instance, **3.2.0** (`GET /api/server/version` ->
+`{"major":3,"minor":2,"patch":0,"prerelease":null}`, read 2026-09-17). Facts tagged `live` below
+were read from that server; it is reachable over HTTPS but its address is not recorded here.
 
 Provenance tags:
 
