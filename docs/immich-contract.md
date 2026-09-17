@@ -79,6 +79,33 @@ Operator shapes we rely on (`spec@3.2.0`):
 - `IdsFilter` = `{ any?|all?|none?: uuid[] }`.
 - `DateFilterNullable` = `{ eq?|ne?|gt?|gte?|lt?|lte? }`, ISO datetimes with offset or `Z`.
 
+`live` (2026-09-17), all four probes answered `HTTP 200`:
+
+| Query | assets `total` | `nextCursor` |
+|---|---|---|
+| `type IMAGE, visibility timeline, trashedAt null` | 1 | present |
+| `rating: { gte: 4 }` | 1 | null |
+| `rating: { eq: null }` | 1 | present |
+| `rating: { eq: 0 }` | 0 | null |
+
+So `filter.rating.gte` works and the pool query is confirmed. `eq: null` selects the unrated.
+
+Two readings of that table matter.
+
+**`total` is the page, not the match count.** Every probe passed `size: 1` and got `total: 1`,
+including the candidate filter, which matches the whole 18,902 asset library. `total` and `count`
+were identical in all four. Do not use `total` for a progress bar or a library count: page until
+`nextCursor` is null and count what comes back. The CLI already does this and never reads `total`.
+
+**`rating: { eq: 0 }` is accepted and matches nothing**, rather than being rejected. It answered
+200 with zero results, not 400. The numeric bounds on the filter are wide enough to admit 0; what
+makes 0 invalid is that no asset can hold it. This says nothing about whether a **write** of 0 is
+rejected, which was not probed, because the CLI clamps to 1..5 and can never send it.
+
+`rating: { gte: 4 }` returning exactly one asset with no next page is also the current state of the
+library: essentially nothing is rated by hand yet, so the first run is a genuine cold start on the
+zero-shot path, and that single asset is imported as a label and frozen.
+
 ### Pagination changed too
 
 `MetadataSearchDto.page` is deprecated. The live shape is `cursor` in, `nextCursor` out:
@@ -255,8 +282,8 @@ socket on DSM is root-owned, so sections 1 and 3 get `permission denied` otherwi
 1. ~~`smart_search` column quoting and `vector` length~~. **Closed 2026-09-17**, see section 4.
 2. ~~`machineLearning.clip.modelName`~~. **Closed 2026-09-17**, see section 6.
 3. ~~A live `/predict` round trip confirming the double encoding~~. **Closed 2026-09-17**, section 5.
-4. Live confirmation that `filter.rating.gte` behaves as documented. Probe section 4, curl only,
-   so it answers without root. Still open.
+4. ~~Live confirmation that `filter.rating.gte` behaves as documented~~. **Closed 2026-09-17**,
+   see section 2. Nothing is outstanding.
 
 ## Host facts, confirmed 2026-09-17
 

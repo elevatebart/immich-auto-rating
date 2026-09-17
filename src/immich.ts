@@ -137,6 +137,8 @@ export class ImmichClient {
   }
 }
 
+// `total` is the size of the page, not the match count, so never read it. Page until nextCursor
+// is null and count the items instead. Verified against 3.2.0, see docs/immich-contract.md.
 interface SearchResponse {
   assets: { items: Asset[]; nextCursor: string | null; total: number; count: number }
 }
