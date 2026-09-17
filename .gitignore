@@ -1,0 +1,21 @@
+node_modules/
+dist/
+
+# Personal: the household names. Only the example is tracked.
+/*.toml
+!/config.example.toml
+
+# The secrets live here. Only the example is tracked.
+/.env
+/.env.*
+!/.env.example
+
+# The container's mount: config, state and probe logs.
+/data/
+/state/
+*.sqlite
+*.sqlite-journal
+probe-*.txt
+
+.claude/settings.local.json
+.DS_Store

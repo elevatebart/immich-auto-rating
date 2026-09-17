@@ -1,0 +1,68 @@
+#!/bin/sh
+# One-off probe for the open items in docs/immich-contract.md. Paste into a DSM user-defined
+# script task, run once, then read the log. Writes nothing to Immich and prints no secrets.
+DOCKER=/usr/local/bin/docker
+BASE=/volume1/docker/immich-auto-rating
+LOG="$BASE/probe-$(date +%Y%m%d-%H%M%S).txt"
+
+mkdir -p "$BASE"
+exec > "$LOG" 2>&1
+echo "immich-auto-rating probe, $(date -Is)"
+
+say() { echo; echo "=== $1 ==="; }
+
+say "containers"
+$DOCKER ps --format '{{.Names}}\t{{.Image}}\t{{.Ports}}'
+
+say "networks"
+$DOCKER network ls --format '{{.Name}}'
+
+PG=$($DOCKER ps --format '{{.Names}}' | grep -iE 'postgres|database|immich[-_]db' | head -1)
+ML=$($DOCKER ps --format '{{.Names}}' | grep -iE 'machine[-_]learning' | head -1)
+NET=$($DOCKER inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$ML" 2>/dev/null | head -1)
+echo "postgres=$PG  ml=$ML  network=$NET"
+
+# 1. smart_search shape: the table, the declared vector width, and the width actually stored.
+say "1. smart_search"
+if [ -n "$PG" ]; then
+  $DOCKER exec "$PG" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\d smart_search"'
+  $DOCKER exec "$PG" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT format_type(a.atttypid, a.atttypmod) AS declared, count(*) OVER () FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid WHERE c.relname = '"'"'smart_search'"'"' AND a.attname = '"'"'embedding'"'"';"'
+  $DOCKER exec "$PG" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT vector_dims(embedding) AS stored_width, count(*) FROM smart_search GROUP BY 1;"'
+else
+  echo "SKIP: no postgres container matched"
+fi
+
+# 2. The CLIP model Immich is configured with. Needs a key with adminConfig.read.
+say "2. clip model"
+if [ -f "$BASE/.env" ]; then
+  # shellcheck disable=SC1090
+  . "$BASE/.env"
+fi
+if [ -n "$IMMICH_API_KEY" ]; then
+  curl -sS -H "x-api-key: $IMMICH_API_KEY" \
+    "${IMMICH_URL:-https://photos.ledoux.cloud}/api/admin/config" \
+    | sed -n 's/.*"clip":{\([^}]*\)}.*/clip:{\1}/p'
+  echo "(empty above means the key lacks adminConfig.read, or the shape moved)"
+else
+  echo "SKIP: put IMMICH_API_KEY=... in $BASE/.env first"
+fi
+
+# 3. The /predict contract: is the clip value a JSON string, and how wide.
+say "3. ml predict"
+if [ -n "$NET" ]; then
+  MODEL=$($DOCKER exec "$PG" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A -c "SELECT value FROM system_metadata WHERE key = '"'"'system-config'"'"';"' 2>/dev/null \
+    | sed -n 's/.*"clip":{[^}]*"modelName":"\([^"]*\)".*/\1/p')
+  [ -z "$MODEL" ] && MODEL=ViT-B-32__openai
+  echo "asking for modelName=$MODEL"
+  $DOCKER run --rm --network "$NET" curlimages/curl:latest -sS \
+    -F "entries={\"clip\":{\"textual\":{\"modelName\":\"$MODEL\"}}}" \
+    -F 'text=a photo of a paper receipt' \
+    "http://$ML:3003/predict" | cut -c1-240
+  echo
+  echo "(a leading \"clip\":\" with a quote means double encoded, as the contract expects)"
+else
+  echo "SKIP: could not resolve the ML container network"
+fi
+
+say "done"
+echo "log: $LOG"

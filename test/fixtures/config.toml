@@ -1,0 +1,65 @@
+# immich-auto-rating configuration.
+# No secrets here: IMMICH_API_KEY, PGPASSWORD and the rest come from the environment.
+
+[household]
+# Immich person names, or ids if two people share a name. Names are resolved once per run.
+persons = ["Bart Ledoux", "Thais Heintz"]
+
+[prompts]
+# Zero-shot text prompts, used until the state DB holds ridge.min_labels frozen labels.
+# Scoring is a softmax over positive and negative together, so the two lists compete.
+positive = [
+  "a photo of a family together",
+  "a portrait of a person, sharp and well lit",
+  "a beautiful landscape photograph",
+  "a candid moment between people",
+  "a well composed travel photograph",
+]
+negative = [
+  "a screenshot of a phone screen",
+  "a screenshot of a computer application",
+  "a photo of a paper receipt",
+  "a scan of a document or a form",
+  "a photo of a computer screen showing text",
+  "a blurry accidental photo",
+  "a photo of a parking sign or a label",
+]
+
+[pool]
+album = "Wallpaper pool"
+min_rating = 4
+
+[exif]
+# A ratio within tolerance of one of these reads as screenshot shaped, but only when the file
+# carries no EXIF camera make. 4:3 and 16:9 are camera ratios too, so the ratio alone proves nothing.
+screenshot_ratios = [1.7777, 2.1666, 2.0, 1.6, 1.3333]
+ratio_tolerance = 0.012
+# Case insensitive substrings tested against the original file name.
+filename_patterns = ["screenshot", "screen shot", "capture", "scan_", "img_scan", "receipt", "facture"]
+
+[albums]
+# Optional. Album names matching any of these substrings mark their assets as trip photos.
+trip_patterns = ["trip", "voyage", "holiday", "vacances"]
+
+[ridge]
+lambda = 1.0
+min_labels = 150
+# Folds for the k-fold MAE that refit prints. Ignored when labels are fewer than folds.
+folds = 5
+
+[zeroshot]
+# A negative prompt has to beat every positive one by this much softmax mass to force a 1.
+negative_margin = 0.15
+# Quantile cut points over the run's positive mass, low to high, giving the 1..5 buckets.
+quantiles = [0.15, 0.4, 0.7, 0.9]
+
+[ml]
+# Leave empty to read machineLearning.clip.modelName from GET /api/admin/config.
+# Set it when the API key is not allowed adminConfig.read.
+model_name = ""
+
+[write]
+# Assets per bulk PUT /api/assets call, and how many of those run at once.
+batch_size = 250
+concurrency = 4
+max_retries = 5

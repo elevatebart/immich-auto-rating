@@ -1,0 +1,31 @@
+{
+  "name": "immich-auto-rating",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Rates the principal images in an Immich library 1-5, learning from the ratings you correct by hand.",
+  "license": "ISC",
+  "engines": { "node": ">=24" },
+  "bin": { "immich-auto-rating": "dist/cli.js" },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "scan": "node --env-file-if-exists=.env dist/cli.js scan",
+    "rate": "node --env-file-if-exists=.env dist/cli.js rate --dry-run",
+    "apply": "node --env-file-if-exists=.env dist/cli.js apply",
+    "report": "node --env-file-if-exists=.env dist/cli.js report",
+    "refit": "node --env-file-if-exists=.env dist/cli.js refit"
+  },
+  "dependencies": {
+    "pg": "^8.16.3",
+    "smol-toml": "^1.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.15.5",
+    "tsdown": "^0.15.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
