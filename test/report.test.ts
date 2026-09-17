@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { assetUrl, buildReport, formatReport } from '../src/report.js'
 import type { Scored } from '../src/types.js'
 
-const s = (id: string, rating: number, uncertainty: number): Scored =>
-  ({ id, rating, uncertainty, raw: rating, reason: 'ridge' }) as Scored
+const s = (id: string, rating: number, uncertainty: number, rule?: string): Scored =>
+  ({ id, rating, uncertainty, raw: rating, reason: 'ridge', rule }) as Scored
 
 describe('buildReport', () => {
   it('counts every bucket, including the empty ones', () => {
@@ -29,6 +29,36 @@ describe('buildReport', () => {
     expect(report.total).toBe(0)
     expect(report.uncertain).toEqual([])
     expect(formatReport(report, 'ridge')).toContain('rated: 0')
+  })
+})
+
+describe('report diagnostics', () => {
+  it('counts the pool against the configured threshold', () => {
+    const scored = [s('a', 5, 0.4), s('b', 4, 0.4), s('c', 3, 0.4), s('d', 1, 0.4)]
+    expect(buildReport(scored, 'http://i', 30, 4).poolSize).toBe(2)
+    expect(buildReport(scored, 'http://i', 30, 5).poolSize).toBe(1)
+  })
+
+  it('breaks down which rule settled each rating', () => {
+    const scored = [
+      s('a', 1, 0.5, 'screenshot'),
+      s('b', 1, 0.1, 'negative-prompt'),
+      s('c', 5, 0.4, 'household-bump'),
+      s('d', 3, 0.4, 'quantile'),
+      s('e', 1, 0.5, 'screenshot'),
+    ]
+    expect(buildReport(scored, 'http://i').rules).toEqual({
+      screenshot: 2,
+      'negative-prompt': 1,
+      'household-bump': 1,
+      quantile: 1,
+    })
+  })
+
+  it('shows the pool share and the rule breakdown in the text form', () => {
+    const out = formatReport(buildReport([s('a', 5, 0.4, 'quantile')], 'http://i', 30, 4), 'zero-shot')
+    expect(out).toContain('pool at >= 4 star: 1 assets')
+    expect(out).toContain('quantile')
   })
 })
 

@@ -1,5 +1,5 @@
 import { cosine } from './db.js'
-import type { Candidate, Config, Rating, Scored } from './types.js'
+import type { Candidate, Config, Rating, Rule, Scored } from './types.js'
 
 export interface ZeroShotPrompts {
   vectors: Float64Array[]
@@ -79,23 +79,39 @@ export function scoreZeroShot(
   const ranks = rankFractions(scored.map((x) => x.s.positiveMass))
 
   return scored.map(({ c, s }, i) => {
-    const rank = ranks[i]!
-    let rating: Rating = bucket(rank, cfg.zeroshot.quantiles)
-    if (c.features.householdFaces > 0) rating = Math.min(5, rating + 1) as Rating
-    if (c.features.screenshotShaped || s.negativeLead >= cfg.zeroshot.negativeMargin) rating = 1
+    let rating: Rating = bucket(ranks[i]!, cfg.zeroshot.quantiles)
+    let rule: Rule = 'quantile'
+    if (c.features.householdFaces > 0 && rating < 5) {
+      rating = (rating + 1) as Rating
+      rule = 'household-bump'
+    }
+    if (s.negativeLead >= cfg.zeroshot.negativeMargin) {
+      rating = 1
+      rule = 'negative-prompt'
+    }
+    // Last, because a screenshot is a screenshot whatever the prompts thought.
+    if (c.features.screenshotShaped) {
+      rating = 1
+      rule = 'screenshot'
+    }
 
     return {
       id: c.asset.id,
       rating,
       raw: s.positiveMass,
-      uncertainty: distanceToCut(rank, cfg.zeroshot.quantiles),
+      uncertainty: confidence(s.positiveMass, rule),
       reason: 'zero-shot' as const,
+      rule,
     }
   })
 }
 
-/** 0 sits on a bucket boundary, 0.5 sits as far from one as the cut points allow. */
-function distanceToCut(rank: number, cuts: number[]): number {
-  if (cuts.length === 0) return 0.5
-  return Math.min(0.5, Math.min(...cuts.map((c) => Math.abs(rank - c))))
+/**
+ * How torn the prompt softmax is. 0 means the positives and negatives split the mass evenly,
+ * which is the photo worth a human look; 0.5 means one side took nearly all of it.
+ */
+export function confidence(positiveMass: number, rule: Rule): number {
+  // A screenshot is settled by its shape, not by the prompts, so it is not worth anyone's attention.
+  if (rule === 'screenshot') return 0.5
+  return Math.abs(positiveMass - 0.5)
 }

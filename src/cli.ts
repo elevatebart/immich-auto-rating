@@ -96,18 +96,26 @@ async function main(): Promise<number> {
     const plan = await score(cfg, env, prep)
 
     if (args.command === 'report') {
-      const report = buildReport(plan.scored, env.immichUrl, args.top)
-      log.info('report', { mode: plan.mode, counts: report.counts, total: report.total })
+      const report = buildReport(plan.scored, env.immichUrl, args.top, cfg.pool.minRating)
+      log.info('report', {
+        mode: plan.mode,
+        counts: report.counts,
+        rules: report.rules,
+        pool: { minRating: cfg.pool.minRating, size: report.poolSize },
+        total: report.total,
+      })
       process.stdout.write(formatReport(report, plan.mode) + '\n')
       return 0
     }
 
     if (args.command === 'rate') {
-      const report = buildReport(plan.scored, env.immichUrl, args.top)
+      const report = buildReport(plan.scored, env.immichUrl, args.top, cfg.pool.minRating)
       log.info('rate.plan', {
         mode: plan.mode,
         dryRun: true,
         counts: report.counts,
+        rules: report.rules,
+        pool: { minRating: cfg.pool.minRating, size: report.poolSize },
         total: report.total,
         skippedFrozen: plan.skippedFrozen,
         noEmbedding: plan.noEmbedding,

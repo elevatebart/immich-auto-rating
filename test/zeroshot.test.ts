@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bucket, promptScore, quantileCuts, rankFractions, scoreZeroShot } from '../src/zeroshot.js'
+import { bucket, confidence, promptScore, quantileCuts, rankFractions, scoreZeroShot } from '../src/zeroshot.js'
 import { normalise } from '../src/db.js'
 import { buildFeatures } from '../src/features.js'
 import { asset, testConfig } from './fixtures/assets.js'
@@ -118,5 +118,58 @@ describe('scoreZeroShot', () => {
   it('skips assets with no embedding rather than scoring them blind', () => {
     const missing = { ...candidate('x', POSITIVE), embedding: undefined }
     expect(scoreZeroShot([missing], prompts, testConfig)).toHaveLength(0)
+  })
+})
+
+describe('confidence', () => {
+  it('is 0 when the prompts split the mass evenly and 0.5 when one side takes it all', () => {
+    expect(confidence(0.5, 'quantile')).toBeCloseTo(0, 6)
+    expect(confidence(1, 'quantile')).toBeCloseTo(0.5, 6)
+    expect(confidence(0, 'quantile')).toBeCloseTo(0.5, 6)
+    expect(confidence(0.4, 'quantile')).toBeCloseTo(0.1, 6)
+  })
+
+  it('treats a screenshot as settled, so it never reaches the correction list', () => {
+    expect(confidence(0.5, 'screenshot')).toBe(0.5)
+  })
+
+  it('separates a torn asset from a confident one, which rank distance did not', () => {
+    const torn = confidence(0.51, 'quantile')
+    const sure = confidence(0.99, 'quantile')
+    expect(torn).toBeLessThan(sure)
+  })
+})
+
+describe('scoreZeroShot rules', () => {
+  const V = (...xs: number[]) => normalise(Float64Array.from(xs))
+  const cand = (id: string, embedding: Float64Array, over = {}) => {
+    const a = asset({ id, ...over })
+    return { asset: a, features: buildFeatures(a, testConfig, new Set(), new Set()), embedding }
+  }
+
+  it('records which rule settled each rating', () => {
+    const shot = cand('shot', V(1, 0, 0), { originalFileName: 'Screenshot.png' })
+    const plain = cand('plain', V(1, 0, 0))
+    const out = scoreZeroShot([shot, plain], prompts, testConfig)
+    const byId = new Map(out.map((s) => [s.id, s.rule]))
+    expect(byId.get('shot')).toBe('screenshot')
+    expect(byId.get('plain')).toBe('quantile')
+  })
+
+  it('lets the screenshot rule win over a negative prompt, and both over the bump', () => {
+    const shot = cand('shot', V(0, 1, 0), { originalFileName: 'Screenshot.png' })
+    shot.features = { ...shot.features, householdFaces: 2 }
+    const out = scoreZeroShot([shot, cand('a', V(1, 0, 0))], prompts, testConfig)
+    const s = out.find((x) => x.id === 'shot')!
+    expect(s.rating).toBe(1)
+    expect(s.rule).toBe('screenshot')
+  })
+
+  it('does not label a 5 as bumped when it was already a 5', () => {
+    const cands = Array.from({ length: 20 }, (_, i) => cand(`a${i}`, V(20 - i, i + 1, 0)))
+    for (const c of cands) c.features = { ...c.features, householdFaces: 1 }
+    const out = scoreZeroShot(cands, prompts, testConfig)
+    const fives = out.filter((s) => s.rating === 5)
+    expect(fives.every((s) => s.rule === 'household-bump' || s.rule === 'quantile')).toBe(true)
   })
 })

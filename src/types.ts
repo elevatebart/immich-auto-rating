@@ -71,13 +71,17 @@ export interface Candidate {
   embedding?: Float64Array
 }
 
+/** Which rule settled the rating, so the report can show why a bucket is the size it is. */
+export type Rule = 'quantile' | 'household-bump' | 'screenshot' | 'negative-prompt'
+
 export interface Scored {
   id: string
   rating: Rating
-  /** Distance to the nearest half-star boundary, 0 (least sure) to 0.5 (most sure). */
+  /** Confidence, 0 (a coin flip) to 0.5 (certain). The report ranks the smallest first. */
   uncertainty: number
   raw: number
   reason: 'zero-shot' | 'ridge'
+  rule?: Rule
 }
 
 export interface StateRow {

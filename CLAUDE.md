@@ -36,6 +36,13 @@ hand in the Immich UI. Node 24, TS strict, ESM, tsdown, vitest. Sibling of `immi
   or the file name says so outright. 4:3 and 16:9 are camera ratios.
 - Zero-shot buckets are assigned **on rank**, not on the raw softmax value. A CLIP softmax saturates
   near 0 and 1, so value thresholds collapse into two buckets. There is a test that pins this.
+- `Scored.uncertainty` is confidence, smallest first in the report. For zero-shot it is
+  `|positiveMass - 0.5|`, how torn the prompt softmax is. It is **not** distance to a quantile
+  boundary: ranks over 18k assets are 0.00005 apart, so that measure put ~70 assets at zero and the
+  correction list degenerated into the first 30 by id.
+- Rank mapping makes ratings **relative**. The bottom `quantiles[0]` share of the library gets 1 star
+  whatever it holds, so the buckets say nothing about absolute quality and the pool share is set by
+  the cut points, not by how many good photos there are.
 - The ML container returns the CLIP vector **JSON encoded twice** and **not normalised**. Both are
   handled in `ml.ts` and both have tests.
 - The prompt embedding width and the `smart_search` width are compared before scoring. A mismatch
