@@ -2,12 +2,24 @@
 # One-off probe for the open items in docs/immich-contract.md. Paste into a DSM user-defined
 # script task, run once, then read the log. Writes nothing to Immich and prints no secrets.
 DOCKER=/usr/local/bin/docker
-BASE=/volume1/docker/immich-auto-rating
+
+# The env file holding IMMICH_API_KEY. Override with ENV_FILE=..., else the first of these that
+# exists wins. The log lands beside it, in a directory that demonstrably already exists.
+for candidate in \
+  "$ENV_FILE" \
+  /volume1/tools/immich-auto-rating/.env \
+  /volume1/docker/immich-auto-rating/.env
+do
+  [ -n "$candidate" ] && [ -f "$candidate" ] && ENV_FILE="$candidate" && break
+done
+
+BASE=${OUT:-$(dirname "${ENV_FILE:-/volume1/tools/immich-auto-rating/.env}")}
 LOG="$BASE/probe-$(date +%Y%m%d-%H%M%S).txt"
 
 mkdir -p "$BASE"
 exec > "$LOG" 2>&1
 echo "immich-auto-rating probe, $(date -Is)"
+echo "env file: ${ENV_FILE:-none found}"
 
 say() { echo; echo "=== $1 ==="; }
 
@@ -34,9 +46,9 @@ fi
 
 # 2. The CLIP model Immich is configured with. Needs a key with adminConfig.read.
 say "2. clip model"
-if [ -f "$BASE/.env" ]; then
+if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
   # shellcheck disable=SC1090
-  . "$BASE/.env"
+  . "$ENV_FILE"
 fi
 if [ -n "$IMMICH_API_KEY" ]; then
   curl -sS -H "x-api-key: $IMMICH_API_KEY" \
@@ -44,7 +56,7 @@ if [ -n "$IMMICH_API_KEY" ]; then
     | sed -n 's/.*"clip":{\([^}]*\)}.*/clip:{\1}/p'
   echo "(empty above means the key lacks adminConfig.read, or the shape moved)"
 else
-  echo "SKIP: put IMMICH_API_KEY=... in $BASE/.env first"
+  echo "SKIP: no IMMICH_API_KEY. Put it in /volume1/tools/immich-auto-rating/.env"
 fi
 
 # 3. The /predict contract: is the clip value a JSON string, and how wide.
