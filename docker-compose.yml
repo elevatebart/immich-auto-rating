@@ -22,8 +22,8 @@ services:
     command: ["apply"]
 
 networks:
-  # The network Immich's own compose file creates. Check the real name with `docker network ls`
-  # and edit this if it differs.
+  # Immich's own compose network. Confirmed 2026-09-17: the stack is the `immich-photos` project,
+  # so this is `immich-photos_default`, not the `immich_default` that also exists on this host.
   immich:
     external: true
-    name: immich_default
+    name: immich-photos_default

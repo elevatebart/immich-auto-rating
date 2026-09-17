@@ -76,5 +76,32 @@ else
   echo "SKIP: could not resolve the ML container network"
 fi
 
+# 4. The search filter DSL: does filter.rating take a range, and does the candidate filter work.
+# curl only, so this one answers even when the task is not running as root.
+say "4. search filter DSL"
+if [ -n "$IMMICH_API_KEY" ]; then
+  URL="${IMMICH_URL:-https://photos.ledoux.cloud}/api/search/metadata"
+  probe() {
+    echo "-- $1"
+    code=$(curl -sS -o /tmp/probe4.json -w '%{http_code}' -X POST "$URL" \
+      -H "x-api-key: $IMMICH_API_KEY" -H 'content-type: application/json' -d "$2")
+    echo "HTTP $code"
+    if [ "$code" = "200" ]; then
+      tr '{},' '\n\n\n' < /tmp/probe4.json | grep -E '"(total|count|nextCursor)"' | head -8
+    else
+      head -c 300 /tmp/probe4.json; echo
+    fi
+  }
+  probe "candidate filter (IMAGE, timeline, untrashed)" \
+    '{"filter":{"type":{"eq":"IMAGE"},"visibility":{"eq":"timeline"},"trashedAt":{"eq":null}},"withExif":true,"withPeople":true,"size":1}'
+  probe "rating gte 4 (the pool query)" '{"filter":{"rating":{"gte":4}},"size":1}'
+  probe "rating eq null (unrated)" '{"filter":{"rating":{"eq":null}},"size":1}'
+  probe "rating eq 0 (expected to fail, 0 is invalid on v3)" '{"filter":{"rating":{"eq":0}},"size":1}'
+  rm -f /tmp/probe4.json
+  echo "(the first total is albums, the second is assets)"
+else
+  echo "SKIP: no IMMICH_API_KEY"
+fi
+
 say "done"
 echo "log: $LOG"

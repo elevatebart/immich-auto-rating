@@ -146,16 +146,35 @@ behaves the same whatever directory it runs from. `docker compose` only reads a 
 its own project directory, which is the trap this avoids.
 
 The container joins Immich's own compose network so `immich-machine-learning` and the database
-resolve by name. Check the real name with `docker network ls` and edit `networks.immich.name` if
-it is not `immich_default`.
+resolve by name. On this NAS that network is **`immich-photos_default`**, confirmed 2026-09-17.
+Note there is also an unrelated `immich_default` on the same host; joining that one would resolve
+nothing. `docker network ls` after an Immich stack rename is the place to re-check.
 
 The image runs as `node`, not root, on `node:24-alpine` with `tini` as PID 1. Nothing is scheduled
 inside it: one invocation, one run, exit.
 
+### One-time setup
+
+The container runs as the `node` user, uid 1000, so the bind mount has to be writable by uid 1000
+or the first run cannot create `state.sqlite`. A DSM task running as root creates root-owned
+directories, which uid 1000 cannot write to. Run this once, as a root task:
+
+```bash
+mkdir -p /volume1/tools/immich-auto-rating/data/state && chown -R 1000:1000 /volume1/tools/immich-auto-rating/data
+```
+
+`config.toml` inside `data/` only needs to be readable, but it is simplest to let the `chown` take
+it along.
+
 ### DSM Task Scheduler
 
-Control Panel, Task Scheduler, Create, Scheduled Task, User-defined script. Run as `root` (Docker
-on DSM needs it), monthly, and set the user-defined script to:
+Control Panel, Task Scheduler, Create, Scheduled Task, User-defined script. Run as `root`, monthly,
+and set the user-defined script to:
+
+The task must run as root. DSM's Docker socket is root-owned and there is no usable `docker` group,
+so a non-root task gets `permission denied` on every `docker` call. This costs nothing in practice:
+anyone who can reach the Docker socket can mount the host into a privileged container and become
+root anyway. The user that matters is the container's own, and that is `node`, not root.
 
 ```bash
 cd /volume1/tools/immich-auto-rating && /usr/local/bin/docker compose pull -q rate && /usr/local/bin/docker compose run --rm rate apply

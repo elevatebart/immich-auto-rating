@@ -107,28 +107,44 @@ found to drop whole stacks rather than fold them; `stack.primaryAssetId` is the 
 
 ## 4. CLIP embeddings in Postgres
 
-`src@3.2.0`, `server/src/schema/tables/smart-search.table.ts`:
+`live` (2026-09-17), `\d smart_search` on this database:
 
-    @Table({ name: 'smart_search' })
-    @Index({ name: 'clip_index', using: 'hnsw', expression: `embedding vector_cosine_ops`,
-             with: `ef_construction = 300, m = 16` })
-    class SmartSearchTable {
-      @ForeignKeyColumn(() => AssetTable, { onDelete: 'CASCADE', primary: true }) assetId!: string;
-      @Column({ type: 'vector', length: 512, storage: 'external' }) embedding!: string;
-    }
+                   Table "public.smart_search"
+      Column   |    Type     | Nullable
+    -----------+-------------+----------
+     assetId   | uuid        | not null
+     embedding | vector(512) | not null
+    Indexes:
+        "smart_search_pkey" PRIMARY KEY, btree ("assetId")
+        "clip_index" vchordrq (embedding vector_cosine_ops) WITH (...)
+    Foreign-key constraints:
+        "smart_search_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES asset(id) ON DELETE CASCADE
 
-So: table `smart_search`, PK `"assetId"` (quoted camelCase, Immich convention), column `embedding`,
-pgvector `vector(512)`, cosine index. The read is:
+Table `smart_search`, PK `"assetId"` (**quoted camelCase**, so an unquoted `assetid` will not
+resolve), column `embedding` of `vector(512)`, matching `ViT-B-32__openai` from section 6.
+`SELECT vector_dims(embedding), count(*) GROUP BY 1` returns a single group, **512 across 18,902
+rows**, so nothing on this database is left over from an older model at a different width.
+
+Two things differ from the checked-in schema and are worth knowing:
+
+- The index is **`vchordrq`**, not the `hnsw` that `smart-search.table.ts` declares. This server runs
+  `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0`, so VectorChord provides the
+  index. It changes nothing here, since we only ever `SELECT` the column and never run an ANN
+  search, but it means the checked-in `@Index` is not what is on disk.
+- The referenced table is `asset`, singular.
+
+The read is:
 
     SELECT "assetId", embedding::text FROM smart_search WHERE "assetId" = ANY($1::uuid[])
 
 `embedding::text` gives pgvector's `[0.1,-0.2,...]` literal, which parses without a pgvector client
-binding. **UNVERIFIED**: the exact column quoting and the declared length on *this* database.
-The 512 above is the checked-in default; Immich rewrites the column when the CLIP model changes,
-so a server on a 768-dim model has `vector(768)` here. The CLI reads the dimension from the first
-row rather than assuming, and asserts every later row matches.
+binding. The CLI still reads the dimension from the first row rather than assuming it, and asserts
+every later row matches, so a model change mid-library is caught rather than silently averaged.
 
 Vectors are **not** guaranteed L2-normalised in storage. We normalise on read.
+
+At 18,902 embedded assets the in-memory footprint of a full run is about 78 MB of Float64 vectors.
+Comfortable, but it is the number to watch if the library grows an order of magnitude.
 
 ## 5. `immich-machine-learning` `/predict`
 
@@ -154,6 +170,12 @@ Response is `{ "<task>": <output> }`, keyed by task, so `{"clip": ...}`.
 **JSON string** holding the array, not an array. It needs a second `JSON.parse`. It is also the raw
 ONNX output with **no normalisation applied**, so we L2-normalise it ourselves before any cosine.
 
+`live` (2026-09-17), a textual call for "a photo of a paper receipt" against this container:
+
+    {"clip":"[0.014118268,0.011525948,0.018777901,0.008971203,-0.0056148996,0.03253277,...]"}
+
+Confirmed: the array arrives as a quoted string, double encoded, exactly as above.
+
 `GET /ping` on the same container answers `pong` (text/plain) and is the health check.
 
 ## 6. The CLIP model name
@@ -174,7 +196,13 @@ makes the ML container load a second model and silently embed into a different s
 
 `GET /api/system-config` is the same payload but is **deprecated** in 3.2.0. Use `/admin/config`.
 
-**UNVERIFIED**: the model actually configured on this server. The CLI reads it at startup, compares
+`live` (2026-09-17): this server answers
+
+    "clip": { "enabled": true, "modelName": "ViT-B-32__openai" }
+
+which is the default, and `CLIP_MODEL_INFO` puts it at **512 dimensions**, matching the checked-in
+`vector(512)` in section 4. The key used also carries `adminConfig.read`, so the lookup works and
+`ml.model_name` can stay empty in `config.toml`. The CLI reads it at startup, compares
 the `CLIP_MODEL_INFO` dimension against the width of the vectors coming out of `smart_search`, and
 refuses the run on a mismatch rather than scoring against a mixed space.
 
@@ -221,7 +249,23 @@ this build; a candidate feature for the ridge model later.
 
 Each needs a credential or LAN access this machine does not have.
 
-1. `smart_search` column quoting and `vector` length on this database. Needs `PG*`.
-2. `machineLearning.clip.modelName` on this server. Needs an admin key.
-3. A live `/predict` round trip confirming the double-encoded array. Needs `IMMICH_ML_URL`.
-4. Live confirmation that `filter.rating.gte` behaves as documented. Needs any working key.
+`scripts/nas-probe.sh` closes these out. It must run as **root** in DSM Task Scheduler: the Docker
+socket on DSM is root-owned, so sections 1 and 3 get `permission denied` otherwise.
+
+1. ~~`smart_search` column quoting and `vector` length~~. **Closed 2026-09-17**, see section 4.
+2. ~~`machineLearning.clip.modelName`~~. **Closed 2026-09-17**, see section 6.
+3. ~~A live `/predict` round trip confirming the double encoding~~. **Closed 2026-09-17**, section 5.
+4. Live confirmation that `filter.rating.gte` behaves as documented. Probe section 4, curl only,
+   so it answers without root. Still open.
+
+## Host facts, confirmed 2026-09-17
+
+| Thing | Value |
+|---|---|
+| Immich stack compose project | `immich-photos`, so the network is **`immich-photos_default`** |
+| Postgres container | `immich_postgres`, `postgres:14-vectorchord0.4.3-pgvectors0.2.0` |
+| ML container | `immich_machine_learning`, port 3003, not published on the host |
+| Immich server | `immich_server`, published on host port 2283 |
+| Assets with embeddings | 18,902 |
+
+There is an unrelated `immich_default` network on the same host. Joining it resolves nothing.
