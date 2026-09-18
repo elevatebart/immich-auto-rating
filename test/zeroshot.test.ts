@@ -8,7 +8,7 @@ import type { Candidate } from '../src/types.js'
 const vec = (...xs: number[]) => normalise(Float64Array.from(xs))
 const POSITIVE = vec(1, 0, 0)
 const NEGATIVE = vec(0, 1, 0)
-const prompts = { vectors: [POSITIVE, NEGATIVE], positiveCount: 1 }
+const prompts = { vectors: [POSITIVE, NEGATIVE], positiveCount: 1, texts: ['a good photo', 'a blurry accidental photo'] }
 
 const candidate = (id: string, embedding: Float64Array, over = {}): Candidate => {
   const a = asset({ id, ...over })
@@ -118,6 +118,37 @@ describe('scoreZeroShot', () => {
   it('skips assets with no embedding rather than scoring them blind', () => {
     const missing = { ...candidate('x', POSITIVE), embedding: undefined }
     expect(scoreZeroShot([missing], prompts, testConfig)).toHaveLength(0)
+  })
+})
+
+describe('rule detail', () => {
+  const V = (...xs: number[]) => normalise(Float64Array.from(xs))
+  const cand = (id: string, embedding: Float64Array, over = {}) => {
+    const a = asset({ id, ...over })
+    return { asset: a, features: buildFeatures(a, testConfig, new Set(), new Set()), embedding }
+  }
+
+  it('names the negative prompt that forced a 1', () => {
+    const out = scoreZeroShot([cand('n', V(0, 1, 0)), cand('p', V(1, 0, 0))], prompts, testConfig)
+    const hit = out.find((s) => s.id === 'n')!
+    expect(hit.rule).toBe('negative-prompt')
+    expect(hit.detail).toBe('a blurry accidental photo')
+  })
+
+  it('names which screenshot arm fired', () => {
+    const shot = cand('s', V(1, 0, 0), { originalFileName: 'Screenshot.png' })
+    const out = scoreZeroShot([shot, cand('p', V(1, 0, 0))], prompts, testConfig)
+    expect(out.find((s) => s.id === 's')!.detail).toBe('filename')
+  })
+
+  it('leaves detail off a plain quantile rating', () => {
+    const out = scoreZeroShot([cand('a', V(1, 0, 0)), cand('b', V(0.9, 0.1, 0))], prompts, testConfig)
+    expect(out.every((s) => (s.rule === 'quantile' ? s.detail === undefined : true))).toBe(true)
+  })
+
+  it('reports the winning prompt index', () => {
+    expect(promptScore(NEGATIVE, prompts).topIndex).toBe(1)
+    expect(promptScore(POSITIVE, prompts).topIndex).toBe(0)
   })
 })
 

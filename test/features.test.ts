@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildFeatures, featureVector, resolveHousehold, screenshotShaped } from '../src/features.js'
+import { buildFeatures, featureVector, resolveHousehold, screenshotArm, screenshotShaped } from '../src/features.js'
 import { asset, testConfig } from './fixtures/assets.js'
 
 describe('screenshotShaped', () => {
@@ -41,6 +41,31 @@ describe('screenshotShaped', () => {
   })
 })
 
+describe('screenshotArm', () => {
+  it('names the file name arm', () => {
+    expect(screenshotArm(asset({ id: 'a', originalFileName: 'Screenshot 1.png' }), testConfig)).toBe('filename')
+  })
+
+  it('names the ratio arm, which only fires without a camera make', () => {
+    const noMake = asset({ id: 'b', width: 1170, height: 2532, originalFileName: 'x.png', exifInfo: { make: null } })
+    expect(screenshotArm(noMake, testConfig)).toBe('ratio')
+  })
+
+  it('is null for a camera photo at the same ratio', () => {
+    expect(screenshotArm(asset({ id: 'c', width: 1920, height: 1080, exifInfo: { make: 'SONY' } }), testConfig)).toBeNull()
+  })
+
+  it('prefers the file name when both would fire', () => {
+    const both = asset({ id: 'd', width: 1920, height: 1080, originalFileName: 'screenshot.png', exifInfo: { make: null } })
+    expect(screenshotArm(both, testConfig)).toBe('filename')
+  })
+
+  it('keeps screenshotShaped as the boolean view of the same rule', () => {
+    const a = asset({ id: 'e', originalFileName: 'Screenshot.png' })
+    expect(screenshotShaped(a, testConfig)).toBe(screenshotArm(a, testConfig) !== null)
+  })
+})
+
 describe('buildFeatures', () => {
   const household = new Set(['p1', 'p2'])
 
@@ -67,6 +92,13 @@ describe('buildFeatures', () => {
       new Set(),
     )
     expect(half.gpsPresent).toBe(false)
+  })
+
+  it('carries the screenshot arm through to the features', () => {
+    const shot = asset({ id: 's', originalFileName: 'Screenshot.png' })
+    const f = buildFeatures(shot, testConfig, household, new Set())
+    expect(f.screenshotShaped).toBe(true)
+    expect(f.screenshotArm).toBe('filename')
   })
 
   it('flags membership of a trip album', () => {

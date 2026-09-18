@@ -37,7 +37,10 @@ export function buildReport(
   let poolSize = 0
   for (const s of scored) {
     counts[String(s.rating)] = (counts[String(s.rating)] ?? 0) + 1
-    if (s.rule) rules[s.rule] = (rules[s.rule] ?? 0) + 1
+    if (s.rule) {
+      const key = s.detail ? `${s.rule}: ${s.detail}` : s.rule
+      rules[key] = (rules[key] ?? 0) + 1
+    }
     if (s.rating >= poolMinRating) poolSize++
   }
 
@@ -63,7 +66,7 @@ export function buildReport(
       }
     }
     for (const rule of Object.keys(rules).sort()) {
-      const items = byScore.filter((s) => s.rule === rule)
+      const items = byScore.filter((s) => (s.detail ? `${s.rule}: ${s.detail}` : s.rule) === rule)
       if (items.length > 0) {
         samples.push({ label: `rule ${rule} (${items.length})`, urls: spread(items, sample).map((s) => assetUrl(baseUrl, s.id)) })
       }
@@ -88,7 +91,7 @@ export function formatReport(report: Report, mode: string): string {
   if (Object.keys(report.rules).length > 0) {
     lines.push('settled by:')
     for (const [rule, n] of Object.entries(report.rules).sort((a, b) => b[1] - a[1])) {
-      lines.push(`  ${rule.padEnd(16)} ${String(n).padStart(6)}  ${share(n)}%`)
+      lines.push(`  ${rule.padEnd(38)} ${String(n).padStart(6)}  ${share(n)}%`)
     }
   }
   lines.push('')

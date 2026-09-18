@@ -12,19 +12,25 @@ export const FEATURE_NAMES = [
 ] as const
 
 /**
- * A filename match is enough on its own. A ratio match is not: 4:3 and 16:9 are camera ratios too,
- * so it only counts when the file also carries no camera make.
+ * Which arm fired, so a false positive can be traced to the rule that caused it rather than
+ * guessed at. A filename match is enough alone; a ratio match needs a missing camera make too.
  */
-export function screenshotShaped(asset: Asset, cfg: Config): boolean {
+export function screenshotArm(asset: Asset, cfg: Config): 'filename' | 'ratio' | null {
   const name = asset.originalFileName.toLowerCase()
-  if (cfg.exif.filenamePatterns.some((p) => name.includes(p))) return true
-  if (asset.exifInfo?.make) return false
+  if (cfg.exif.filenamePatterns.some((p) => name.includes(p))) return 'filename'
+  if (asset.exifInfo?.make) return null
 
   const w = asset.width ?? asset.exifInfo?.exifImageWidth ?? 0
   const h = asset.height ?? asset.exifInfo?.exifImageHeight ?? 0
-  if (!w || !h) return false
+  if (!w || !h) return null
   const ratio = Math.max(w, h) / Math.min(w, h)
   return cfg.exif.screenshotRatios.some((r) => Math.abs(ratio - r) <= cfg.exif.ratioTolerance)
+    ? 'ratio'
+    : null
+}
+
+export function screenshotShaped(asset: Asset, cfg: Config): boolean {
+  return screenshotArm(asset, cfg) !== null
 }
 
 export function buildFeatures(
@@ -36,12 +42,14 @@ export function buildFeatures(
   const people = asset.people ?? []
   const householdFaces = people.filter((p) => householdPersonIds.has(p.id)).length
   const exif = asset.exifInfo
+  const arm = screenshotArm(asset, cfg)
   return {
     householdFaces,
     anyFace: people.length > 0,
     exifMakePresent: Boolean(exif?.make),
     gpsPresent: exif?.latitude != null && exif?.longitude != null,
-    screenshotShaped: screenshotShaped(asset, cfg),
+    screenshotShaped: arm !== null,
+    screenshotArm: arm,
     inTripAlbum: tripAssetIds.has(asset.id),
     isFavorite: asset.isFavorite,
   }
