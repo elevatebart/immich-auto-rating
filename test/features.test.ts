@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { buildFeatures, featureVector, resolveHousehold, screenshotArm, screenshotShaped } from '../src/features.js'
 import { asset, testConfig } from './fixtures/assets.js'
 
+// The shipped config leaves screenshot_ratios empty, which switches the ratio arm off. The arm is
+// still code, so these give it ratios rather than testing it through a config that disables it.
+const withRatios = {
+  ...testConfig,
+  exif: { ...testConfig.exif, screenshotRatios: [1.7777, 2.1666, 2.0, 1.6, 1.3333] },
+}
+
 describe('screenshotShaped', () => {
   it('trusts the file name whatever the EXIF says', () => {
     expect(screenshotShaped(asset({ id: 'a', originalFileName: 'Screenshot 2024.png' }), testConfig)).toBe(true)
@@ -11,17 +18,29 @@ describe('screenshotShaped', () => {
 
   it('does not call a 4:3 camera photo a screenshot', () => {
     const photo = asset({ id: 'p', width: 4032, height: 3024, exifInfo: { make: 'Apple' } })
-    expect(screenshotShaped(photo, testConfig)).toBe(false)
+    expect(screenshotShaped(photo, withRatios)).toBe(false)
   })
 
   it('does not call a 16:9 camera photo a screenshot', () => {
     const photo = asset({ id: 'p', width: 1920, height: 1080, exifInfo: { make: 'SONY' } })
-    expect(screenshotShaped(photo, testConfig)).toBe(false)
+    expect(screenshotShaped(photo, withRatios)).toBe(false)
   })
 
-  it('catches a phone screenshot: screen ratio and no camera make', () => {
+  it('catches a phone screenshot when ratios are configured', () => {
     const shot = asset({ id: 's', width: 1170, height: 2532, originalFileName: 'IMG_1.png', exifInfo: { make: null } })
-    expect(screenshotShaped(shot, testConfig)).toBe(true)
+    expect(screenshotShaped(shot, withRatios)).toBe(true)
+  })
+
+  it('is off when screenshot_ratios is empty, which is the shipped default', () => {
+    const shot = asset({ id: 's', width: 1170, height: 2532, originalFileName: 'IMG_1.png', exifInfo: { make: null } })
+    expect(testConfig.exif.screenshotRatios).toEqual([])
+    expect(screenshotShaped(shot, testConfig)).toBe(false)
+  })
+
+  it('still catches an old camera photo when ratios are on, which is why they are off', () => {
+    const oldPhoto = asset({ id: 'o', width: 4032, height: 3024, originalFileName: 'IMG_0983.JPG', exifInfo: { make: null } })
+    expect(screenshotShaped(oldPhoto, withRatios)).toBe(true)
+    expect(screenshotShaped(oldPhoto, testConfig)).toBe(false)
   })
 
   it('falls back to the EXIF dimensions when width and height are missing', () => {
@@ -32,7 +51,7 @@ describe('screenshotShaped', () => {
       originalFileName: 'a.png',
       exifInfo: { make: null, exifImageWidth: 2560, exifImageHeight: 1440 },
     })
-    expect(screenshotShaped(shot, testConfig)).toBe(true)
+    expect(screenshotShaped(shot, withRatios)).toBe(true)
   })
 
   it('says no when there are no dimensions at all', () => {
@@ -48,7 +67,7 @@ describe('screenshotArm', () => {
 
   it('names the ratio arm, which only fires without a camera make', () => {
     const noMake = asset({ id: 'b', width: 1170, height: 2532, originalFileName: 'x.png', exifInfo: { make: null } })
-    expect(screenshotArm(noMake, testConfig)).toBe('ratio')
+    expect(screenshotArm(noMake, withRatios)).toBe('ratio')
   })
 
   it('is null for a camera photo at the same ratio', () => {
@@ -57,7 +76,11 @@ describe('screenshotArm', () => {
 
   it('prefers the file name when both would fire', () => {
     const both = asset({ id: 'd', width: 1920, height: 1080, originalFileName: 'screenshot.png', exifInfo: { make: null } })
-    expect(screenshotArm(both, testConfig)).toBe('filename')
+    expect(screenshotArm(both, withRatios)).toBe('filename')
+  })
+
+  it('keeps the file name arm working with ratios off', () => {
+    expect(screenshotArm(asset({ id: 'f', originalFileName: 'Screenshot.png' }), testConfig)).toBe('filename')
   })
 
   it('keeps screenshotShaped as the boolean view of the same rule', () => {

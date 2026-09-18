@@ -39,9 +39,15 @@ album = "Wallpaper pool"
 min_rating = 5
 
 [exif]
-# A ratio within tolerance of one of these reads as screenshot shaped, but only when the file
-# carries no EXIF camera make. 4:3 and 16:9 are camera ratios too, so the ratio alone proves nothing.
-screenshot_ratios = [1.7777, 2.1666, 2.0, 1.6, 1.3333]
+# EMPTY ON PURPOSE, which switches the ratio rule off. A ratio only ever counted alongside a
+# missing EXIF camera make, and that pair turns out to describe old camera photos, not screenshots:
+# on a real library it fired on 521 assets and a hand review put it at 3 correct in 8, so it was
+# demoting roughly 330 photographs. The sampled misfires were all image/jpeg named IMG_0519.JPG,
+# PICT0028.jpg and the like, at 4032x3024 and 1600x900, so there is no file type left to gate on.
+# Screenshots are caught by filename_patterns and by the two screenshot prompts instead.
+# Exact screen resolutions (1170x2532 and friends) would be precise where a ratio is not, if this
+# ever needs to come back.
+screenshot_ratios = []
 ratio_tolerance = 0.012
 # Case insensitive substrings tested against the original file name.
 filename_patterns = ["screenshot", "screen shot", "capture", "scan_", "img_scan", "receipt", "facture"]

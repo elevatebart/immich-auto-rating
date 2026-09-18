@@ -32,8 +32,15 @@ hand in the Immich UI. Node 24, TS strict, ESM, tsdown, vitest. Sibling of `immi
   even a caller that forgets the check cannot clobber a label.
 - `stack.primaryAssetId === id` is the principal test. `withStacked` is not a substitute: it drops
   whole stacks rather than folding them, which the sibling planner found the hard way.
-- A ratio match alone never means screenshot. It only counts alongside a missing EXIF camera make,
-  or the file name says so outright. 4:3 and 16:9 are camera ratios.
+- `exif.screenshot_ratios` ships **empty**, which switches the ratio arm off. Ratio plus a missing
+  EXIF make describes old camera photos, not screenshots: it fired on 521 assets of a real library
+  at 3 correct in 8, and the sampled misfires were all `image/jpeg` named `IMG_0519.JPG` or
+  `PICT0028.jpg` at 4032x3024, so no file type gate can rescue it. The arm is still code and still
+  tested; the tests that exercise it pass their own config with ratios, never the fixture.
+  Screenshots are caught by `filename_patterns` and by the two screenshot prompts.
+- Negative prompts name a **subject**, never a quality. `"a blurry accidental photo"` was 44% of all
+  negative hits and was catching ordinary soft photographs; blur needs no prompt because it already
+  ranks low against the positives.
 - Zero-shot buckets are assigned **on rank**, not on the raw softmax value. A CLIP softmax saturates
   near 0 and 1, so value thresholds collapse into two buckets. There is a test that pins this.
 - `Scored.uncertainty` is confidence, smallest first in the report. For zero-shot it is
