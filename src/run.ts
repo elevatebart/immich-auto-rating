@@ -40,10 +40,10 @@ export async function prepare(
     log.warn('household.unmatched', { names: household.unmatched })
   }
 
-  const albums = await client.getAlbums()
   const tripAssetIds = new Set<string>()
   if (cfg.albums.tripPatterns.length > 0) {
-    for (const album of albums) {
+    // Only fetched when a trip pattern needs it, so album.read is optional on the key.
+    for (const album of await client.getAlbums()) {
       const name = album.albumName.toLowerCase()
       if (!cfg.albums.tripPatterns.some((p) => name.includes(p))) continue
       for (const id of await client.albumAssetIds(album.id)) tripAssetIds.add(id)

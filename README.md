@@ -50,7 +50,7 @@ trains as a `1`.
     npm run scan                         # enumerate and sync corrections, no writes
     npm run rate                         # score everything and print the plan, no writes
     npm run report                       # counts plus the 30 to go correct
-    npm run apply                        # write ratings and reconcile the pool album
+    npm run apply                        # write the ratings
     npm run refit                        # k-fold MAE over the frozen labels
 
 ### Commands
@@ -59,7 +59,7 @@ trains as a `1`.
 |---|---|---|
 | `scan` | no | Enumerates candidates, syncs corrections, builds features. |
 | `rate --dry-run` | no | Scores everything and prints the plan. |
-| `apply` | **yes** | Writes ratings, then reconciles the pool album. |
+| `apply` | **yes** | Writes ratings, and reconciles the pool album when `pool.album` is set. |
 | `report` | no | Counts per rating, plus the 30 least certain with web links. |
 | `refit` | no | Retrains from frozen labels, prints k-fold MAE. |
 | `freeze <id...>` | no | Freezes assets by hand, taking their current rating as the label. |
@@ -128,17 +128,35 @@ no photo content and no metadata.
 Scope the key to exactly these eight. The first four are the obvious ones; the rest are what the
 pool album and the model lookup actually need:
 
-    asset.read  asset.update  album.read  albumAsset.create
-    album.create  albumAsset.delete  person.read  adminConfig.read
+    asset.read  asset.update  person.read  adminConfig.read
+
+Add these three only if you set `pool.album`, or if `albums.trip_patterns` is in use (that one
+needs `album.read` alone):
+
+    album.read  album.create  albumAsset.create  albumAsset.delete
 
 `adminConfig.read` is admin-level and only buys the CLIP model name. To keep it off a scheduled
 key, set `ml.model_name` in `config.toml` instead and drop it from the list.
 
-## The pool album
+## The pool
 
-After writing ratings, `apply` reconciles the album named by `pool.album`, creating it if missing.
-Assets at or above `pool.min_rating` are added, assets that dropped below are removed. Anything the
-run did not score is left alone, so an album is never emptied by a partial run.
+The rating is the output. There is no album by default: `pool.min_rating` only decides what the
+report counts as the pool, and anything that wants that set asks the API, which needs no album and
+is never stale:
+
+```bash
+curl -sS -X POST "$IMMICH_URL/api/search/metadata" -H "x-api-key: $IMMICH_API_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"filter":{"rating":{"gte":5},"type":{"eq":"IMAGE"},"visibility":{"eq":"timeline"},"trashedAt":{"eq":null}},"size":1000}'
+```
+
+Page it with `cursor` from the response's `nextCursor`. In the Immich web UI the same filter is a
+normal search you can bookmark.
+
+Set `pool.album` to a name only when something needs a real album object: an Immich slideshow, a
+photo frame app that takes an album id, or a share link. `apply` then reconciles it, adding assets
+at or above `pool.min_rating` and removing those that dropped below. Anything the run did not score
+is left alone, so a partial run never empties it.
 
 ## State
 

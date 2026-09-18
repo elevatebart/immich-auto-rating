@@ -21,7 +21,8 @@ hand in the Immich UI. Node 24, TS strict, ESM, tsdown, vitest. Sibling of `immi
 - `src/pool.ts`: `planPool` is pure, `applyPool` does the I/O.
 - `src/write.ts`: groups by rating, one bulk `PUT /assets` per batch, capped concurrency.
 - `src/run.ts`: the orchestrator. `prepare` (enumerate, sync, build features), `score`, `refit`.
-- `src/cli.ts`: the verbs. The only place that decides an exit code.
+- `src/cli.ts`: the verbs. The only place that decides an exit code, and the only place that decides
+  whether the pool album is touched at all.
 
 ## Invariants
 - **Ratings on Immich 3 are `-1` or `1..5` or `null`. `0` is invalid and must never be sent.**
@@ -55,7 +56,14 @@ hand in the Immich UI. Node 24, TS strict, ESM, tsdown, vitest. Sibling of `immi
 - The prompt embedding width and the `smart_search` width are compared before scoring. A mismatch
   means the ML container and the stored vectors are different CLIP models, and the run is refused
   rather than scored across two spaces.
-- The pool album never loses an asset the run did not score. `planPool` takes `seen` for exactly this.
+- `pool.album` ships **empty**, so no album is created or touched. The rating is the output and the
+  pool is a query: `filter.rating.gte` on `POST /search/metadata`, verified live on 3.2.0. An album
+  is only for something that needs an album object (a slideshow, a frame app, a share link), and
+  setting one is what pulls `album.create` and the `albumAsset.*` permissions onto the key.
+- `GET /albums` is fetched only when `albums.trip_patterns` or `pool.album` needs it, so `album.read`
+  stays optional too.
+- With an album configured, it never loses an asset the run did not score. `planPool` takes `seen`
+  for exactly this.
 - Every forcing rule names **why** it fired in `Scored.detail`: which screenshot arm (`filename` or
   `ratio`), or the text of the negative prompt that won. The report keys its rule breakdown on
   `rule: detail`, so a misfiring prompt or arm is a count rather than an inference. A hand review of
