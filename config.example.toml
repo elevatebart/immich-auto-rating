@@ -33,7 +33,17 @@ negative = [
 ]
 
 [pool]
-album = "Wallpaper pool"
+# EMPTY ON PURPOSE: no album is created or touched. The rating itself is the output, and anything
+# that wants the pool asks the API for it, which needs no album and is always current:
+#
+#   POST /api/search/metadata
+#   {"filter": {"rating": {"gte": 5}, "type": {"eq": "IMAGE"},
+#               "visibility": {"eq": "timeline"}, "trashedAt": {"eq": null}}, "size": 1000}
+#
+# Set a name here only when something needs a real album object: an Immich slideshow, a photo frame
+# app that takes an album id, or a share link. Doing so also needs album.create, albumAsset.create
+# and albumAsset.delete on the API key, which are otherwise unnecessary.
+album = ""
 # 5 rather than 4. Ratings here are ranks, so a 4 means "top quarter", not "good": at min_rating 4
 # the pool took 39% of the library on a real run.
 min_rating = 5

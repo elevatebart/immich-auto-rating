@@ -5,7 +5,7 @@ import { testConfig } from './fixtures/assets.js'
 
 describe('config', () => {
   it('reads the example config', () => {
-    expect(testConfig.pool.album).toBe('Wallpaper pool')
+    expect(testConfig.pool.album).toBe('')
     expect(testConfig.pool.minRating).toBe(5)
     expect(testConfig.zeroshot.quantiles).toHaveLength(4)
     expect(testConfig.prompts.negative.length).toBeGreaterThan(0)
@@ -20,6 +20,20 @@ negative = ["b"]
 filename_patterns = ["Screenshot", "SCAN_"]
 `)
     expect(cfg.exif.filenamePatterns).toEqual(['screenshot', 'scan_'])
+  })
+
+  it('ships with no pool album, so nothing is created unless asked', () => {
+    expect(testConfig.pool.album).toBe('')
+  })
+
+  it('trims a configured album name, so whitespace does not read as a name', () => {
+    const cfg = fromToml('[prompts]\npositive = ["a"]\nnegative = ["b"]\n[pool]\nalbum = "   "\n')
+    expect(cfg.pool.album).toBe('')
+  })
+
+  it('keeps a real album name', () => {
+    const cfg = fromToml('[prompts]\npositive = ["a"]\nnegative = ["b"]\n[pool]\nalbum = " Wallpaper pool "\n')
+    expect(cfg.pool.album).toBe('Wallpaper pool')
   })
 
   it('refuses a rating outside 1..5 for the pool', () => {

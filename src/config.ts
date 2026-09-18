@@ -4,7 +4,7 @@ import { parse } from 'smol-toml'
 import type { Config } from './types.js'
 
 const DEFAULTS = {
-  poolAlbum: 'Wallpaper pool',
+  poolAlbum: '',
   poolMinRating: 4,
   ratioTolerance: 0.012,
   lambda: 1,
@@ -83,7 +83,7 @@ export function fromToml(text: string): Config {
       negative: strings(prompts, 'negative', 'prompts'),
     },
     pool: {
-      album: str(pool, 'album', 'pool', DEFAULTS.poolAlbum),
+      album: str(pool, 'album', 'pool', DEFAULTS.poolAlbum).trim(),
       minRating: num(pool, 'min_rating', 'pool', DEFAULTS.poolMinRating),
     },
     exif: {

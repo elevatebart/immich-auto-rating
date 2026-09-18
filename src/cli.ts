@@ -162,19 +162,19 @@ async function apply(
     },
   )
 
-  const eligible = new Set(plan.scored.filter((s) => s.rating >= cfg.pool.minRating).map((s) => s.id))
-  const seen = new Set(plan.scored.map((s) => s.id))
-  const albums = await client.getAlbums()
-  const album = findAlbum(albums, cfg.pool.album)
-  const current = album ? await client.albumAssetIds(album.id) : new Set<string>()
-  const poolPlan = planPool(eligible, current, seen, Boolean(album))
-
-  let pool = { albumId: album?.id ?? '', added: 0, removed: 0 }
-  try {
-    pool = await applyPool(client, cfg.pool.album, poolPlan, album?.id)
-  } catch (e) {
-    log.error('pool.failed', { error: e instanceof Error ? e.message : String(e) })
-    result.failed.push({ ids: [], rating: 0, error: 'pool reconciliation failed' })
+  const eligible = plan.scored.filter((s) => s.rating >= cfg.pool.minRating).length
+  let pool = { albumId: '', added: 0, removed: 0 }
+  if (cfg.pool.album) {
+    try {
+      const ids = new Set(plan.scored.filter((s) => s.rating >= cfg.pool.minRating).map((s) => s.id))
+      const seen = new Set(plan.scored.map((s) => s.id))
+      const album = findAlbum(await client.getAlbums(), cfg.pool.album)
+      const current = album ? await client.albumAssetIds(album.id) : new Set<string>()
+      pool = await applyPool(client, cfg.pool.album, planPool(ids, current, seen, Boolean(album)), album?.id)
+    } catch (e) {
+      log.error('pool.failed', { error: e instanceof Error ? e.message : String(e) })
+      result.failed.push({ ids: [], rating: 0, error: 'pool reconciliation failed' })
+    }
   }
 
   state.markFirstRunDone()
@@ -186,7 +186,9 @@ async function apply(
     failed: failedAssets,
     skippedFrozen: plan.skippedFrozen,
     noEmbedding: plan.noEmbedding,
-    pool: { album: cfg.pool.album, added: pool.added, removed: pool.removed },
+    pool: cfg.pool.album
+      ? { album: cfg.pool.album, added: pool.added, removed: pool.removed }
+      : { album: null, atOrAbove: cfg.pool.minRating, matching: eligible },
   })
 
   if (result.failed.length > 0) {
