@@ -11,6 +11,11 @@ persons = ["Firstname Lastname", "Other Person"]
 [prompts]
 # Zero-shot text prompts, used until the state DB holds ridge.min_labels frozen labels.
 # Scoring is a softmax over positive and negative together, so the two lists compete.
+#
+# Negatives must name a SUBJECT, not a quality. CLIP answers "is this a receipt" well and
+# "is this blurry" badly. "a blurry accidental photo" was 1,010 firings on a real 18,000 asset
+# library, 44% of all negative hits, and it was catching ordinary soft or dim photographs. A
+# genuinely blurry photo already ranks low on the positive prompts, so it needs no hard floor.
 positive = [
   "a photo of a family together",
   "a portrait of a person, sharp and well lit",
@@ -24,7 +29,6 @@ negative = [
   "a photo of a paper receipt",
   "a scan of a document or a form",
   "a photo of a computer screen showing text",
-  "a blurry accidental photo",
   "a photo of a parking sign or a label",
 ]
 
