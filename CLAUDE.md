@@ -49,6 +49,11 @@ hand in the Immich UI. Node 24, TS strict, ESM, tsdown, vitest. Sibling of `immi
   means the ML container and the stored vectors are different CLIP models, and the run is refused
   rather than scored across two spaces.
 - The pool album never loses an asset the run did not score. `planPool` takes `seen` for exactly this.
+- Every forcing rule names **why** it fired in `Scored.detail`: which screenshot arm (`filename` or
+  `ratio`), or the text of the negative prompt that won. The report keys its rule breakdown on
+  `rule: detail`, so a misfiring prompt or arm is a count rather than an inference. A hand review of
+  80 sampled assets put screenshot at 3/8 correct and negative-prompt at 7/9, which is the reason
+  this exists.
 - Pure where it can be: `classify`, `planPool`, `promptScore`, `rankFractions`, `fit`, `isPrincipal`,
   `buildFeatures`. The tests reach those directly and never touch the network.
 

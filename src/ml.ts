@@ -70,12 +70,13 @@ export async function embedPrompts(
   embedder: TextEmbedder,
   positive: string[],
   negative: string[],
-): Promise<{ vectors: Float64Array[]; positiveCount: number }> {
+): Promise<{ vectors: Float64Array[]; positiveCount: number; texts: string[] }> {
+  const texts = [...positive, ...negative]
   const vectors: Float64Array[] = []
-  for (const p of [...positive, ...negative]) vectors.push(await embedder.embed(p))
+  for (const p of texts) vectors.push(await embedder.embed(p))
   const width = vectors[0]?.length ?? 0
   for (const v of vectors) {
     if (v.length !== width) throw new MlError('prompt embeddings came back with mixed widths')
   }
-  return { vectors, positiveCount: positive.length }
+  return { vectors, positiveCount: positive.length, texts }
 }

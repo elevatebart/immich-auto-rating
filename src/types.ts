@@ -61,6 +61,8 @@ export interface Features {
   exifMakePresent: boolean
   gpsPresent: boolean
   screenshotShaped: boolean
+  /** Which arm of the screenshot rule fired, for the report. Not a model feature. */
+  screenshotArm?: 'filename' | 'ratio' | null
   inTripAlbum: boolean
   isFavorite: boolean
 }
@@ -82,6 +84,8 @@ export interface Scored {
   raw: number
   reason: 'zero-shot' | 'ridge'
   rule?: Rule
+  /** Narrows the rule: which screenshot arm, or which prompt won. */
+  detail?: string
 }
 
 export interface StateRow {

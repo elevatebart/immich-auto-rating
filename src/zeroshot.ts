@@ -4,12 +4,16 @@ import type { Candidate, Config, Rating, Rule, Scored } from './types.js'
 export interface ZeroShotPrompts {
   vectors: Float64Array[]
   positiveCount: number
+  /** Same order as `vectors`, so the report can name the prompt that won. */
+  texts?: string[]
 }
 
 export interface PromptScore {
   positiveMass: number
   /** How far the best negative prompt beats the best positive one, 0 when it does not. */
   negativeLead: number
+  /** Index of the highest scoring prompt, so a misfiring one can be named rather than guessed at. */
+  topIndex: number
 }
 
 /**
@@ -26,14 +30,16 @@ export function promptScore(embedding: Float64Array, prompts: ZeroShotPrompts): 
   let positiveMass = 0
   let bestPositive = -Infinity
   let bestNegative = -Infinity
+  let topIndex = 0
   for (let i = 0; i < probs.length; i++) {
     const p = probs[i]!
+    if (p > probs[topIndex]!) topIndex = i
     if (i < prompts.positiveCount) {
       positiveMass += p
       if (p > bestPositive) bestPositive = p
     } else if (p > bestNegative) bestNegative = p
   }
-  return { positiveMass, negativeLead: Math.max(0, bestNegative - bestPositive) }
+  return { positiveMass, negativeLead: Math.max(0, bestNegative - bestPositive), topIndex }
 }
 
 /** Cut points from the run's own distribution, so the buckets fill whatever the prompts score. */
@@ -81,6 +87,7 @@ export function scoreZeroShot(
   return scored.map(({ c, s }, i) => {
     let rating: Rating = bucket(ranks[i]!, cfg.zeroshot.quantiles)
     let rule: Rule = 'quantile'
+    let detail: string | undefined
     if (c.features.householdFaces > 0 && rating < 5) {
       rating = (rating + 1) as Rating
       rule = 'household-bump'
@@ -88,11 +95,13 @@ export function scoreZeroShot(
     if (s.negativeLead >= cfg.zeroshot.negativeMargin) {
       rating = 1
       rule = 'negative-prompt'
+      detail = prompts.texts?.[s.topIndex]
     }
     // Last, because a screenshot is a screenshot whatever the prompts thought.
     if (c.features.screenshotShaped) {
       rating = 1
       rule = 'screenshot'
+      detail = c.features.screenshotArm ?? undefined
     }
 
     return {
@@ -102,6 +111,7 @@ export function scoreZeroShot(
       uncertainty: confidence(s.positiveMass, rule),
       reason: 'zero-shot' as const,
       rule,
+      ...(detail ? { detail } : {}),
     }
   })
 }
