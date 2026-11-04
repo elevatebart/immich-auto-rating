@@ -172,3 +172,8 @@ export function isPrincipal(asset: Asset): boolean {
     isStackPrimary(asset)
   )
 }
+
+/** Immich 3.3 returns ratings inside EXIF. Preserve explicit top-level nulls on older APIs. */
+export function assetRating(asset: Pick<Asset, 'rating' | 'exifInfo'>): number | null {
+  return asset.rating === undefined ? (asset.exifInfo?.rating ?? null) : asset.rating
+}

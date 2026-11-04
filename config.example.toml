@@ -48,6 +48,14 @@ album = ""
 # the pool took 39% of the library on a real run.
 min_rating = 5
 
+# Remove scored photos that fall below min_rating. Set false to keep existing album members.
+# With false, the API key does not need albumAsset.delete.
+remove_below_threshold = true
+
+# Also add photos whose saved Immich rating meets min_rating, including manual ratings.
+# Checked on apply after rating writes, including photos without CLIP embeddings.
+include_manual_ratings = false
+
 [exif]
 # EMPTY ON PURPOSE, which switches the ratio rule off. A ratio only ever counted alongside a
 # missing EXIF camera make, and that pair turns out to describe old camera photos, not screenshots:

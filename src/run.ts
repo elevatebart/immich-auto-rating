@@ -1,5 +1,5 @@
 import type { Config, Candidate, Scored } from './types.js'
-import { ImmichClient, isPrincipal } from './immich.js'
+import { ImmichClient, isPrincipal, assetRating } from './immich.js'
 import { PgEmbeddingStore, type EmbeddingStore } from './db.js'
 import { MlClient, embedPrompts } from './ml.js'
 import { buildFeatures, resolveHousehold } from './features.js'
@@ -58,9 +58,10 @@ export async function prepare(
   const corrections: Corrections = { imported: 0, frozen: 0, relabelled: 0, reset: 0 }
   state.transaction(() => {
     for (const asset of assets) {
-      const action = classify(state.get(asset.id), asset.rating ?? null)
+      const rating = assetRating(asset)
+      const action = classify(state.get(asset.id), rating)
       if (action.kind === 'none') continue
-      state.apply(asset.id, asset.rating ?? null, action)
+      state.apply(asset.id, rating, action)
       if (action.kind === 'import') corrections.imported++
       else if (action.kind === 'freeze') corrections.frozen++
       else if (action.kind === 'relabel') corrections.relabelled++

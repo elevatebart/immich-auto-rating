@@ -4,7 +4,7 @@ export type Rating = 1 | 2 | 3 | 4 | 5
 export interface Config {
   household: { persons: string[] }
   prompts: { positive: string[]; negative: string[] }
-  pool: { album: string; minRating: number }
+  pool: { album: string; minRating: number; removeBelowThreshold: boolean; includeManualRatings: boolean }
   exif: {
     screenshotRatios: number[]
     ratioTolerance: number
@@ -29,6 +29,7 @@ export interface AssetPerson {
 }
 
 export interface ExifInfo {
+  rating?: number | null
   make?: string | null
   model?: string | null
   latitude?: number | null

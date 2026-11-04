@@ -36,6 +36,31 @@ filename_patterns = ["Screenshot", "SCAN_"]
     expect(cfg.pool.album).toBe('Wallpaper pool')
   })
 
+  it('preserves album behavior when the new options are omitted', () => {
+    expect(testConfig.pool.removeBelowThreshold).toBe(true)
+    expect(testConfig.pool.includeManualRatings).toBe(false)
+  })
+
+  it('accepts an add-only album including manually rated photos', () => {
+    const cfg = fromToml(`
+[prompts]
+positive = ["a"]
+negative = ["b"]
+[pool]
+remove_below_threshold = false
+include_manual_ratings = true
+`)
+    expect(cfg.pool.removeBelowThreshold).toBe(false)
+    expect(cfg.pool.includeManualRatings).toBe(true)
+  })
+
+  it.each(['remove_below_threshold', 'include_manual_ratings'])('rejects non-boolean %s', (key) => {
+    for (const value of ['"false"', '0', '[]']) {
+      expect(() => fromToml(`[prompts]\npositive = ["a"]\nnegative = ["b"]\n[pool]\n${key} = ${value}`))
+        .toThrow(`pool.${key} must be a boolean`)
+    }
+  })
+
   it('refuses a rating outside 1..5 for the pool', () => {
     const toml = `
 [prompts]

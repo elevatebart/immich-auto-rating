@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ImmichClient, isPrincipal, isStackPrimary } from '../src/immich.js'
+import { ImmichClient, isPrincipal, isStackPrimary, assetRating } from '../src/immich.js'
 import { asset, searchPage } from './fixtures/assets.js'
 
 const ok = (body: unknown) =>
@@ -105,5 +105,19 @@ describe('ImmichClient', () => {
     const client = new ImmichClient('http://immich', 'key', { fetchImpl: fetchImpl as never })
     await expect(client.updateRatings(['a'], 0)).rejects.toThrow(/400/)
     expect(fetchImpl).toHaveBeenCalledOnce()
+  })
+})
+
+describe('rating compatibility', () => {
+  it('reads current Immich EXIF ratings including rejections', () => {
+    expect(assetRating({ exifInfo: { rating: 5 } })).toBe(5)
+    expect(assetRating({ exifInfo: { rating: -1 } })).toBe(-1)
+    expect(assetRating({ exifInfo: { rating: null } })).toBeNull()
+    expect(assetRating({})).toBeNull()
+  })
+
+  it('preserves older top-level ratings and explicit clears', () => {
+    expect(assetRating({ rating: 4, exifInfo: { rating: 5 } })).toBe(4)
+    expect(assetRating({ rating: null, exifInfo: { rating: 5 } })).toBeNull()
   })
 })
