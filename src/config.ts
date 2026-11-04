@@ -6,6 +6,8 @@ import type { Config } from './types.js'
 const DEFAULTS = {
   poolAlbum: '',
   poolMinRating: 4,
+  poolRemoveBelowThreshold: true,
+  poolIncludeManualRatings: false,
   ratioTolerance: 0.012,
   lambda: 1,
   minLabels: 150,
@@ -64,6 +66,13 @@ function str(t: Record<string, unknown>, key: string, where: string, fallback: s
   return v
 }
 
+function bool(t: Record<string, unknown>, key: string, where: string, fallback: boolean): boolean {
+  const v = t[key]
+  if (v === undefined) return fallback
+  if (typeof v !== 'boolean') throw new ConfigError(`${where}.${key} must be a boolean`)
+  return v
+}
+
 export function fromToml(text: string): Config {
   const root = parse(text) as Record<string, unknown>
   const household = table(root, 'household')
@@ -85,6 +94,8 @@ export function fromToml(text: string): Config {
     pool: {
       album: str(pool, 'album', 'pool', DEFAULTS.poolAlbum).trim(),
       minRating: num(pool, 'min_rating', 'pool', DEFAULTS.poolMinRating),
+      removeBelowThreshold: bool(pool, 'remove_below_threshold', 'pool', DEFAULTS.poolRemoveBelowThreshold),
+      includeManualRatings: bool(pool, 'include_manual_ratings', 'pool', DEFAULTS.poolIncludeManualRatings),
     },
     exif: {
       screenshotRatios: numbers(exif, 'screenshot_ratios', 'exif', []),

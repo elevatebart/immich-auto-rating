@@ -44,6 +44,14 @@ Consequences for us:
 N requests at concurrency 4. `PUT /api/assets/{id}` (`updateAsset`) stays as the fallback and as
 the retry path for a bulk call that partly failed.
 
+### Reading ratings on Immich 3.3.5
+
+Live verification on 2026-11-04 against Immich 3.3.5 found `exifInfo.rating` in both
+`POST /api/search/metadata` responses with `withExif = true` and `GET /api/assets/{id}`.
+Those responses omit the top-level `rating`. The client reads the EXIF value when the
+top-level property is absent and preserves an explicit top-level `null` on older responses.
+This applies to first-run label import, correction detection, clears, and `freeze`.
+
 ## 2. The `rating` search filter: exact, and deprecated
 
 Two shapes exist in 3.2.0 and this matters.
@@ -258,7 +266,7 @@ The brief asked for `asset.read`, `asset.update`, `album.read`, `albumAsset.crea
 | `album.read` | `GET /albums` |
 | `albumAsset.create` | `PUT /albums/{id}/assets` |
 | `album.create` | creating the pool album when it is missing |
-| `albumAsset.delete` | dropping assets that fell below `pool_min_rating` |
+| `albumAsset.delete` | dropping scored assets below `pool.min_rating` when `pool.remove_below_threshold = true` |
 | `person.read` | resolving `household.persons` names to ids via `GET /people` |
 | `adminConfig.read` | reading `machineLearning.clip.modelName` |
 

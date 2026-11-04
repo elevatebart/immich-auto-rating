@@ -17,6 +17,12 @@ describe('planPool', () => {
     expect(plan.remove).toEqual(['b'])
   })
 
+  it('keeps scored and manually added photos when removal is disabled', () => {
+    const plan = planPool(set('a', 'new'), set('a', 'lowered', 'manual'), set('a', 'lowered'), true, false)
+    expect(plan.add).toEqual(['new'])
+    expect(plan.remove).toEqual([])
+  })
+
   it('leaves assets this run never looked at alone', () => {
     // 'old' is in the album but was not scored, so it is not evidence of a drop.
     const plan = planPool(set('a'), set('a', 'old'), set('a'), true)
@@ -94,6 +100,15 @@ describe('applyPool', () => {
     )
     expect(client.addAssetsToAlbum).toHaveBeenCalledTimes(3)
     expect(client.removeAssetsFromAlbum).toHaveBeenCalledWith('album1', ['x'])
+  })
+
+  it('applies an add-only plan without using the album removal permission', async () => {
+    const client = stub()
+    const plan = planPool(set('new'), set('lowered', 'manual'), set('new', 'lowered'), true, false)
+    const out = await applyPool(client as unknown as ImmichClient, 'Wallpaper pool', plan, 'album1')
+    expect(client.addAssetsToAlbum).toHaveBeenCalledWith('album1', ['new'])
+    expect(client.removeAssetsFromAlbum).not.toHaveBeenCalled()
+    expect(out).toEqual({ albumId: 'album1', added: 1, removed: 0 })
   })
 })
 

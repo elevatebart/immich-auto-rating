@@ -41,6 +41,9 @@ The accepted range is `-1` to `5`, and **`0` is no longer valid**. `null` means 
 rejected. This CLI only ever writes `1`-`5`. A `-1` you set by hand counts as a correction and
 trains as a `1`.
 
+Ratings are read from `exifInfo.rating` on Immich 3.3.5. Responses with a top-level `rating`
+are also supported, including an explicit `null` when a rating is cleared.
+
 ## Install and run locally
 
     npm ci && npm test && npm run build
@@ -92,6 +95,8 @@ exits non-zero after logging `apply.partial_failure` with the counts.
   because the household bump promotes a share of the 4 star bucket into 5:
   `5 star share = (1 - cut4) + household_face_rate * (cut4 - cut3)`.
 - `pool.min_rating`: 5 by default. At 4 the pool took 39% of a real 18,000 asset library.
+- `pool.remove_below_threshold` controls whether scored photos can be removed from the album.
+- `pool.include_manual_ratings` includes qualifying saved ratings when populating the album.
 - `ridge.min_labels`: how many corrections before the learned model takes over from the prompts.
 - `ml.model_name`: leave empty to read it from the server. Set it when the API key is not allowed
   `adminConfig.read`.
@@ -130,10 +135,13 @@ pool album and the model lookup actually need:
 
     asset.read  asset.update  person.read  adminConfig.read
 
-Add these three only if you set `pool.album`, or if `albums.trip_patterns` is in use (that one
-needs `album.read` alone):
+Configuring `pool.album` requires the following album permissions. `albums.trip_patterns`
+also needs `album.read`.
 
-    album.read  album.create  albumAsset.create  albumAsset.delete
+    album.read  album.create  albumAsset.create
+
+`albumAsset.delete` is also required when `pool.remove_below_threshold = true`, the default.
+With `pool.remove_below_threshold = false`, the API key can omit `albumAsset.delete`.
 
 `adminConfig.read` is admin-level and only buys the CLIP model name. To keep it off a scheduled
 key, set `ml.model_name` in `config.toml` instead and drop it from the list.
@@ -154,9 +162,36 @@ Page it with `cursor` from the response's `nextCursor`. In the Immich web UI the
 normal search you can bookmark.
 
 Set `pool.album` to a name only when something needs a real album object: an Immich slideshow, a
-photo frame app that takes an album id, or a share link. `apply` then reconciles it, adding assets
-at or above `pool.min_rating` and removing those that dropped below. Anything the run did not score
-is left alone, so a partial run never empties it.
+photo frame app that takes an album id, or a share link. By default, `apply` adds scored photos
+at or above `pool.min_rating` and removes scored photos that dropped below it. Photos the run
+did not score remain in the album.
+
+Two independent options control album membership.
+
+| Setting | Default | Behavior |
+|---|---|---|
+| `pool.remove_below_threshold` | `true` | Remove scored photos that fall below the threshold. Set `false` to preserve every existing album member, including manual additions. |
+| `pool.include_manual_ratings` | `false` | Set `true` to also include photos whose saved Immich rating meets the threshold, including frozen photos and photos without CLIP embeddings. |
+
+For a photo frame album that keeps existing members and picks up manual five-star ratings,
+use the following configuration.
+
+```toml
+[pool]
+album = "Photo frame"
+min_rating = 5
+remove_below_threshold = false
+include_manual_ratings = true
+```
+
+With `include_manual_ratings` enabled, `apply` queries saved ratings after writing automatic
+ratings. Only principal, visible, untrashed images qualify. Manual ratings remain frozen and
+contribute training labels. Album additions happen on the next `apply`, following your external
+scheduler. A later manual rating reduction keeps the photo in an add-only album.
+
+`rate --dry-run` and `report` show the automatic scoring pool. Their counts exclude frozen
+manual ratings and existing album members retained by the add-only setting. Omitting the new
+options preserves the previous album behavior.
 
 ## State
 

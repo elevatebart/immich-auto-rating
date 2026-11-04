@@ -17,12 +17,15 @@ export function planPool(
   current: ReadonlySet<string>,
   seen: ReadonlySet<string>,
   albumExists: boolean,
+  removeBelowThreshold = true,
 ): PoolPlan {
   const add: string[] = []
   for (const id of eligible) if (!current.has(id)) add.push(id)
 
   const remove: string[] = []
-  for (const id of current) if (seen.has(id) && !eligible.has(id)) remove.push(id)
+  if (removeBelowThreshold) {
+    for (const id of current) if (seen.has(id) && !eligible.has(id)) remove.push(id)
+  }
 
   return { add, remove, createAlbum: !albumExists }
 }

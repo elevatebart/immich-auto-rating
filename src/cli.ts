@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { loadConfig } from './config.js'
 import { readEnv } from './env.js'
-import { ImmichClient } from './immich.js'
+import { ImmichClient, assetRating, isPrincipal } from './immich.js'
 import { State, toLabel } from './state.js'
 import { openStore, prepare, refit, score } from './run.js'
 import { applyPool, findAlbum, planPool } from './pool.js'
@@ -9,6 +9,7 @@ import { writeRatings } from './write.js'
 import { buildReport, formatReport } from './report.js'
 import { log } from './log.js'
 import type { EmbeddingStore } from './db.js'
+import type { Asset } from './types.js'
 
 const USAGE = `immich-auto-rating <command>
 
@@ -166,11 +167,16 @@ async function apply(
   let pool = { albumId: '', added: 0, removed: 0 }
   if (cfg.pool.album) {
     try {
-      const ids = new Set(plan.scored.filter((s) => s.rating >= cfg.pool.minRating).map((s) => s.id))
+      let ids = new Set(plan.scored.filter((s) => s.rating >= cfg.pool.minRating).map((s) => s.id))
+      if (cfg.pool.includeManualRatings) {
+        const ratedAssets = await client.searchCandidates({ rating: { gte: cfg.pool.minRating } })
+        ids = new Set(ratedAssets.filter(isPrincipal).map((asset) => asset.id))
+      }
       const seen = new Set(plan.scored.map((s) => s.id))
       const album = findAlbum(await client.getAlbums(), cfg.pool.album)
       const current = album ? await client.albumAssetIds(album.id) : new Set<string>()
-      pool = await applyPool(client, cfg.pool.album, planPool(ids, current, seen, Boolean(album)), album?.id)
+      const poolPlan = planPool(ids, current, seen, Boolean(album), cfg.pool.removeBelowThreshold)
+      pool = await applyPool(client, cfg.pool.album, poolPlan, album?.id)
     } catch (e) {
       log.error('pool.failed', { error: e instanceof Error ? e.message : String(e) })
       result.failed.push({ ids: [], rating: 0, error: 'pool reconciliation failed' })
@@ -211,14 +217,15 @@ async function freeze(ids: string[], env: ReturnType<typeof readEnv>, state: Sta
   let failed = 0
   for (const id of ids) {
     try {
-      const asset = await client.request<{ rating?: number | null }>('GET', `/assets/${id}`)
-      if (asset.rating == null) {
+      const asset = await client.request<Pick<Asset, 'rating' | 'exifInfo'>>('GET', `/assets/${id}`)
+      const rating = assetRating(asset)
+      if (rating == null) {
         log.error('freeze.unrated', { id, hint: 'rate it in Immich first, a frozen asset needs a label' })
         failed++
         continue
       }
-      state.freeze(id, toLabel(asset.rating))
-      log.info('freeze.done', { id, label: toLabel(asset.rating) })
+      state.freeze(id, toLabel(rating))
+      log.info('freeze.done', { id, label: toLabel(rating) })
     } catch (e) {
       log.error('freeze.failed', { id, error: e instanceof Error ? e.message : String(e) })
       failed++
